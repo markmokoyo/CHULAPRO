@@ -1,0 +1,274 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { Bell, BellOff, Vibrate, Watch } from 'lucide-react';
+import type { HapticCueEvent, HapticPatternType } from '@cuepulse/shared';
+
+interface WatchSimulatorHUDProps {
+  activeCue: HapticCueEvent | null;
+  cooldownRemainingMs: number;
+  liveAlertsEnabled: boolean;
+  onToggleLiveAlerts: () => void;
+}
+
+const PATTERN_STYLE: Record<
+  HapticPatternType,
+  { ring: string; stroke: string; badge: string; label: string; vibratePattern: number[] }
+> = {
+  SOFT_TICK: {
+    ring: 'border-[#EC3D6A] shadow-[#EC3D6A]/35',
+    stroke: '#EC3D6A',
+    badge: 'bg-[#FFD1DF] text-[#BE2257]',
+    label: 'Soft Tick (80ms)',
+    vibratePattern: [80],
+  },
+  DOUBLE_PULSE: {
+    ring: 'border-amber-500 shadow-amber-500/35',
+    stroke: '#F59E0B',
+    badge: 'bg-amber-100 text-amber-800',
+    label: 'Double Pulse (100ms×2)',
+    vibratePattern: [100, 80, 100],
+  },
+  GENTLE_WAVE: {
+    ring: 'border-[#CC6B92] shadow-[#CC6B92]/35',
+    stroke: '#CC6B92',
+    badge: 'bg-[#F7C8E0]/60 text-[#9D2954]',
+    label: 'Gentle Wave (300ms)',
+    vibratePattern: [300],
+  },
+};
+
+const QUICK_TESTS: Array<{
+  pattern: HapticPatternType;
+  label: string;
+  reason: HapticCueEvent['reason'];
+  messageTh: string;
+}> = [
+  {
+    pattern: 'SOFT_TICK',
+    label: 'Soft Tick',
+    reason: 'FILLER_WORD',
+    messageTh: 'ตัวอย่าง: พบคำฟุ่มเฟือย ("อืม/อ่า") — หายใจพักสั้นๆ',
+  },
+  {
+    pattern: 'DOUBLE_PULSE',
+    label: 'Double Pulse',
+    reason: 'SPEAKING_TOO_FAST',
+    messageTh: 'ตัวอย่าง: พูดเร็วเกิน 220 SPM — ชะลอจังหวะลงเล็กน้อย',
+  },
+  {
+    pattern: 'GENTLE_WAVE',
+    label: 'Gentle Wave',
+    reason: 'BAD_POSTURE',
+    messageTh: 'ตัวอย่าง: ยืดไหล่ตรง & สบตากล้องอย่างมั่นใจ',
+  },
+];
+
+const RING_RADIUS = 42;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+export function WatchSimulatorHUD({
+  activeCue,
+  cooldownRemainingMs,
+  liveAlertsEnabled,
+  onToggleLiveAlerts,
+}: WatchSimulatorHUDProps) {
+  const [previewCue, setPreviewCue] = useState<HapticCueEvent | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    };
+  }, []);
+
+  const triggerTestPattern = (preset: (typeof QUICK_TESTS)[number]) => {
+    const sample: HapticCueEvent = {
+      id: `preview-${Date.now()}`,
+      timestampMs: 0,
+      pattern: preset.pattern,
+      reason: preset.reason,
+      messageTh: preset.messageTh,
+      slideNumber: 1,
+    };
+    setPreviewCue(sample);
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(PATTERN_STYLE[preset.pattern].vibratePattern);
+      } catch {
+        // Ignore on unsupported browsers
+      }
+    }
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = setTimeout(() => {
+      setPreviewCue(null);
+    }, 1800);
+  };
+
+  const displayCue = activeCue ?? previewCue;
+  const cooldownSec = Math.ceil(cooldownRemainingMs / 1000);
+  const cooldownProgress = Math.max(
+    0,
+    Math.min(100, ((20_000 - cooldownRemainingMs) / 20_000) * 100)
+  );
+  const style = displayCue ? PATTERN_STYLE[displayCue.pattern] : null;
+  const ringRatio = displayCue ? 1 : cooldownProgress / 100;
+  const ringOffset = RING_CIRCUMFERENCE * (1 - ringRatio);
+  const ringStrokeColor = displayCue
+    ? style?.stroke
+    : cooldownSec > 0
+      ? '#FB6F92'
+      : '#EC3D6A';
+
+  return (
+    <div className="rounded-2xl border border-[#E8DCE0] bg-white p-4 shadow-sm space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+          <Watch className="h-4 w-4 text-[#EC3D6A]" />
+          นาฬิกาเตือนจังหวะ (จำลองสมาร์ทวอทช์)
+        </div>
+        <button
+          type="button"
+          onClick={onToggleLiveAlerts}
+          className={`app-press flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${
+            liveAlertsEnabled
+              ? 'bg-[#FCE8EE] text-[#BE2257] border border-[#F2C4D0]'
+              : 'bg-slate-100 text-slate-500 border border-slate-200'
+          }`}
+        >
+          {liveAlertsEnabled ? (
+            <>
+              <Bell className="h-3.5 w-3.5" />
+              เปิดสั่นเตือน
+            </>
+          ) : (
+            <>
+              <BellOff className="h-3.5 w-3.5" />
+              ปิดสั่นเตือน
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-4">
+        {/* Circular Watch Face with SVG Progress Ring */}
+        <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+          {displayCue && (
+            <div
+              className={`animate-pulse-ring absolute inset-0 rounded-full border-2 ${style?.ring}`}
+            />
+          )}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 96 96"
+            className="absolute inset-0 h-full w-full -rotate-90"
+          >
+            <circle
+              cx="48"
+              cy="48"
+              r={RING_RADIUS}
+              fill="none"
+              stroke="#F5EEF0"
+              strokeWidth="4"
+            />
+            <circle
+              cx="48"
+              cy="48"
+              r={RING_RADIUS}
+              fill="none"
+              stroke={ringStrokeColor}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={ringOffset}
+              className="transition-all duration-300"
+            />
+          </svg>
+          <div
+            className={`relative flex h-[74px] w-[74px] flex-col items-center justify-center rounded-full border-2 bg-slate-900 text-center shadow-lg transition-all ${
+              displayCue ? `animate-watch-buzz ${style?.ring}` : 'border-[#E8DCE0]'
+            }`}
+          >
+            {displayCue ? (
+              <>
+                <span className="text-[10px] font-bold text-white">PULSE</span>
+                <span className="mt-0.5 text-[9px] text-[#FF9EB8] px-1 leading-tight">
+                  {displayCue.pattern.replace('_', ' ')}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-xs font-semibold text-white">
+                  {cooldownSec > 0 ? `${cooldownSec}s` : 'READY'}
+                </span>
+                <span className="text-[9px] text-[#FF8FAB]">
+                  {cooldownSec > 0 ? 'พักเตือน' : '20s Window'}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Status & Cooldown Bar */}
+        <div className="min-w-0 flex-1 space-y-2">
+          {displayCue ? (
+            <div>
+              <span
+                className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${style?.badge}`}
+              >
+                {style?.label}
+              </span>
+              <p className="mt-1 text-sm font-semibold text-[#1F161A]">
+                {displayCue.messageTh}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600">
+              {liveAlertsEnabled
+                ? 'พร้อมส่งสัญญาณเตือนแบบไร้เสียง (พักเตือนขั้นต่ำ 20 วินาที)'
+                : 'ปิดการสั่นระหว่างพูดแล้ว — ระบบจะบันทึกผลไว้ในรายงานแทน'}
+            </p>
+          )}
+
+          <div>
+            <div className="mb-1 flex justify-between text-[11px] text-slate-500">
+              <span>ระยะพักเตือน (20 วินาที)</span>
+              <span>{cooldownSec > 0 ? `รออีก ${cooldownSec}s` : 'พร้อมเตือน'}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F5EEF0]">
+              <div
+                className="h-full bg-[#FB6F92] transition-all duration-300"
+                style={{ width: `${cooldownProgress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Haptic Pattern Tester */}
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-[#E8DCE0] pt-2.5">
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 mr-1">
+          <Vibrate className="h-3 w-3 text-[#EC3D6A]" />
+          ลองจังหวะสั่น:
+        </span>
+        {QUICK_TESTS.map((preset) => {
+          const isTesting = previewCue?.pattern === preset.pattern;
+          return (
+            <button
+              key={preset.pattern}
+              type="button"
+              onClick={() => triggerTestPattern(preset)}
+              className={`app-press rounded-lg px-2 py-1 text-[11px] font-semibold border transition-colors ${
+                isTesting
+                  ? 'bg-[#EC3D6A] text-white border-[#EC3D6A]'
+                  : 'bg-[#FAF6F7] text-[#1F161A] border-[#D8C5CB] hover:bg-[#FCE8EE]'
+              }`}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

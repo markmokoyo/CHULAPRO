@@ -1,0 +1,16 @@
+{
+  "name": "cuepulse-ai",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace=@cuepulse/web run dev",
+    "build": "npm --workspace=@cuepulse/web run build",
+    "lint": "npm --workspace=@cuepulse/web run lint",
+    "typecheck": "npm --workspace=@cuepulse/shared run typecheck && npm --workspace=@cuepulse/web run typecheck",
+    "test": "npm --workspace=@cuepulse/shared run test"
+  }
+}
