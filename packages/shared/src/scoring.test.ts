@@ -155,5 +155,38 @@ describe('Session & Team Report Builders', () => {
     expect(teamReport.handoffTransitions[0].fromMemberId).toBe('m1');
     expect(teamReport.handoffTransitions[0].toMemberId).toBe('m2');
     expect(teamReport.handoffTransitions[0].gapSeconds).toBe(2.5);
+    expect(teamReport.teamBalanceScore).toBe(100);
+    expect(teamReport.handoffScore).toBe(100);
+    expect(teamReport.memberReports[0].individualScore).toBeGreaterThan(0);
+    expect(teamReport.memberReports[1].individualScore).toBeGreaterThan(0);
+  });
+
+  it('penalizes unbalanced speaking share and slow handoff gaps in team mode', () => {
+    const members: TeamMemberProfile[] = [
+      { memberId: 'm1', name: 'A', assignedSlides: [1], enrolledAt: '' },
+      { memberId: 'm2', name: 'B', assignedSlides: [2], enrolledAt: '' },
+    ];
+    const timeline: TelemetrySnapshot[] = [
+      { timestampMs: 1000, currentSpm: 200, eyeContactScore: 0.9, postureScore: 0.9, isSlouching: false, isArmsCrossed: false, isSwaying: false, isSpeaking: true, activeSpeakerId: 'm1' },
+      { timestampMs: 2000, currentSpm: 200, eyeContactScore: 0.9, postureScore: 0.9, isSlouching: false, isArmsCrossed: false, isSwaying: false, isSpeaking: true, activeSpeakerId: 'm1' },
+      { timestampMs: 3000, currentSpm: 200, eyeContactScore: 0.9, postureScore: 0.9, isSlouching: false, isArmsCrossed: false, isSwaying: false, isSpeaking: true, activeSpeakerId: 'm1' },
+      { timestampMs: 8000, currentSpm: 200, eyeContactScore: 0.9, postureScore: 0.9, isSlouching: false, isArmsCrossed: false, isSwaying: false, isSpeaking: true, activeSpeakerId: 'm2' },
+    ];
+
+    const teamReport = buildTeamSessionReport({
+      sessionId: 't2',
+      durationSeconds: 10,
+      members,
+      telemetryTimeline: timeline,
+      fillers: [],
+      hapticCues: [],
+      transcriptSegments: [],
+    });
+
+    expect(teamReport.memberReports[0].speakingSharePercent).toBe(75);
+    expect(teamReport.memberReports[1].speakingSharePercent).toBe(25);
+    expect(teamReport.teamBalanceScore).toBeLessThan(100);
+    expect(teamReport.handoffTransitions[0].gapSeconds).toBe(5);
+    expect(teamReport.handoffScore).toBeLessThan(100);
   });
 });

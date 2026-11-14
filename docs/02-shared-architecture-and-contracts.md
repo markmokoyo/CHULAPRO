@@ -158,9 +158,12 @@ export interface TeamMemberProfile {
 
 export interface TeamSessionReport extends SessionReport {
   mode: 'team';
+  teamBalanceScore?: number;         // คะแนนความสมดุลการแบ่งเวลาพูดในทีม (0-100)
+  handoffScore?: number;             // คะแนนความลื่นไหลการส่งไม้ต่อ (0-100)
   memberReports: {
     memberId: string;
     name: string;
+    individualScore?: number;        // คะแนนรวมรายบุคคล (0-100)
     speakingSeconds: number;
     speakingSharePercent: number;
     averageSpm: number;

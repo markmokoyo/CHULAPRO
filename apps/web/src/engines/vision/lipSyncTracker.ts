@@ -22,6 +22,11 @@ export function computeMouthOpenRatio(face: NormalizedLandmark[]): number {
 export class TeamLipSyncTracker {
   private readonly historyByMember = new Map<string, number[]>();
   private readonly windowSize = 8;
+  private readonly switchConfirmFrames = 4;
+  private readonly switchRatioThreshold = 1.2;
+  private currentSpeakerId: string | undefined;
+  private pendingSpeakerId: string | undefined;
+  private pendingCount = 0;
 
   matchFacesToMembers(
     faces: NormalizedLandmark[][],
@@ -66,6 +71,7 @@ export class TeamLipSyncTracker {
 
     let bestMemberId: string | undefined;
     let maxVariance = -1;
+    let currentVariance = 0;
 
     for (const [memberId, face] of matched.entries()) {
       const ratio = computeMouthOpenRatio(face);
@@ -78,16 +84,59 @@ export class TeamLipSyncTracker {
       const variance =
         hist.reduce((a, v) => a + (v - mean) ** 2, 0) / hist.length;
 
+      if (memberId === this.currentSpeakerId) {
+        currentVariance = variance;
+      }
+
       if (variance > maxVariance) {
         maxVariance = variance;
         bestMemberId = memberId;
       }
     }
 
-    return bestMemberId ?? members[0]?.memberId;
+    if (!bestMemberId) {
+      return this.currentSpeakerId ?? members[0]?.memberId;
+    }
+
+    if (!this.currentSpeakerId) {
+      this.currentSpeakerId = bestMemberId;
+      this.pendingSpeakerId = undefined;
+      this.pendingCount = 0;
+      return this.currentSpeakerId;
+    }
+
+    if (bestMemberId === this.currentSpeakerId) {
+      this.pendingSpeakerId = undefined;
+      this.pendingCount = 0;
+      return this.currentSpeakerId;
+    }
+
+    // Require clear margin + consecutive frames before switching speaker to avoid jitter
+    if (maxVariance >= currentVariance * this.switchRatioThreshold) {
+      if (this.pendingSpeakerId === bestMemberId) {
+        this.pendingCount += 1;
+      } else {
+        this.pendingSpeakerId = bestMemberId;
+        this.pendingCount = 1;
+      }
+
+      if (this.pendingCount >= this.switchConfirmFrames) {
+        this.currentSpeakerId = bestMemberId;
+        this.pendingSpeakerId = undefined;
+        this.pendingCount = 0;
+      }
+    } else {
+      this.pendingSpeakerId = undefined;
+      this.pendingCount = 0;
+    }
+
+    return this.currentSpeakerId;
   }
 
   reset(): void {
     this.historyByMember.clear();
+    this.currentSpeakerId = undefined;
+    this.pendingSpeakerId = undefined;
+    this.pendingCount = 0;
   }
 }

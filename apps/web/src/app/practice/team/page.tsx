@@ -243,6 +243,7 @@ export default function TeamPracticePage() {
         acousticFillerDetected: false,
       };
 
+      const matchedFaces = lipTrackerRef.current.matchFacesToMembers(faces, members);
       const detectedSpeaker = lipTrackerRef.current.detectActiveSpeaker(
         faces,
         members,
@@ -267,9 +268,11 @@ export default function TeamPracticePage() {
 
       setCooldownRemainingMs(cooldownRef.current.remainingCooldownMs(relMs));
 
+      const speakerId = detectedSpeaker ?? activeSpeakerRef.current;
+      const activeFace = (speakerId ? matchedFaces.get(speakerId) : undefined) ?? faces[0];
       const visionMetrics = analyzePostureAndGaze({
         pose,
-        face: faces[0],
+        face: activeFace,
         baseline: null,
         recentHipXHistory: [],
       });

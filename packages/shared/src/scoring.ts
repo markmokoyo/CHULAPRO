@@ -241,23 +241,23 @@ export function buildTeamSessionReport(input: {
   });
 
   const timeline = input.telemetryTimeline;
-  const totalSpeakingSnapshots = timeline.filter((t) => t.activeSpeakerId).length || 1;
+  const speakingTimeline = timeline.filter((t) => t.activeSpeakerId && t.isSpeaking);
+  const totalSpeakingSnapshots = speakingTimeline.length;
   const stepSeconds =
-    timeline.length > 1
-      ? input.durationSeconds / timeline.length
-      : input.durationSeconds;
+    timeline.length > 0 ? input.durationSeconds / timeline.length : 0;
 
   const memberReports: TeamMemberReport[] = input.members.map((member) => {
-    const memberSpoke = timeline.filter(
-      (t) => t.activeSpeakerId === member.memberId && t.isSpeaking
+    const memberSpoke = speakingTimeline.filter(
+      (t) => t.activeSpeakerId === member.memberId
     );
     const memberListening = timeline.filter(
       (t) => t.activeSpeakerId && t.activeSpeakerId !== member.memberId
     );
     const speakingSeconds = Math.round(memberSpoke.length * stepSeconds);
-    const speakingSharePercent = Math.round(
-      (memberSpoke.length / totalSpeakingSnapshots) * 100
-    );
+    const speakingSharePercent =
+      totalSpeakingSnapshots > 0
+        ? Math.round((memberSpoke.length / totalSpeakingSnapshots) * 100)
+        : 0;
     const averageSpm =
       memberSpoke.length > 0
         ? Math.round(
@@ -294,11 +294,25 @@ export function buildTeamSessionReport(input: {
               memberListening.length) *
               100
           )
-        : 100;
+        : memberSpoke.length > 0
+          ? eyeContactRatio
+          : 0;
+
+    const memberDurationMin = Math.max(speakingSeconds / 60, 1 / 60);
+    const individualScore =
+      memberSpoke.length > 0
+        ? calculateOverallScore({
+            eyeContactRatio,
+            goodPostureRatio: postureRatio,
+            averageSpm,
+            fillerPerMinute: fillerCount / memberDurationMin,
+          })
+        : 0;
 
     return {
       memberId: member.memberId,
       name: member.name,
+      individualScore,
       speakingSeconds,
       speakingSharePercent,
       averageSpm,
@@ -313,7 +327,7 @@ export function buildTeamSessionReport(input: {
   let lastSpeakerId: string | undefined;
   let lastSpeakerEndMs = 0;
 
-  for (const snap of timeline) {
+  for (const snap of speakingTimeline) {
     if (!snap.activeSpeakerId) continue;
     if (!lastSpeakerId) {
       lastSpeakerId = snap.activeSpeakerId;
@@ -334,10 +348,73 @@ export function buildTeamSessionReport(input: {
     lastSpeakerEndMs = snap.timestampMs;
   }
 
+  const teamBalanceScore = calculateTeamBalanceScore(memberReports);
+  const handoffScore = calculateHandoffScore(
+    handoffTransitions,
+    memberReports.filter((m) => m.speakingSeconds > 0 || m.speakingSharePercent > 0)
+      .length,
+    input.members.length
+  );
+
+  const activeMemberScores = memberReports
+    .filter((m) => (m.individualScore ?? 0) > 0)
+    .map((m) => m.individualScore ?? 0);
+  const avgIndividualScore =
+    activeMemberScores.length > 0
+      ? activeMemberScores.reduce((a, b) => a + b, 0) / activeMemberScores.length
+      : base.overallScore;
+
+  const teamOverallScore =
+    timeline.length > 0
+      ? clampPercent(
+          Math.round(
+            avgIndividualScore * 0.7 +
+              teamBalanceScore * 0.15 +
+              handoffScore * 0.15
+          )
+        )
+      : base.overallScore;
+
   return {
     ...base,
+    overallScore: teamOverallScore,
     mode: 'team',
+    teamBalanceScore,
+    handoffScore,
     memberReports,
     handoffTransitions,
   };
+}
+
+function calculateTeamBalanceScore(memberReports: TeamMemberReport[]): number {
+  const n = memberReports.length;
+  if (n <= 1) return memberReports.some((m) => m.speakingSharePercent > 0) ? 100 : 0;
+  const totalShare = memberReports.reduce((s, m) => s + m.speakingSharePercent, 0);
+  if (totalShare <= 0) return 0;
+
+  const ideal = 100 / n;
+  const avgDeviation =
+    memberReports.reduce(
+      (sum, m) => sum + Math.abs(m.speakingSharePercent - ideal),
+      0
+    ) / n;
+  const maxDeviation = (100 * 2 * (n - 1)) / (n * n);
+  return clampPercent(Math.round(100 * (1 - avgDeviation / maxDeviation)));
+}
+
+function calculateHandoffScore(
+  transitions: HandoffTransition[],
+  activeSpeakersCount: number,
+  totalMembersCount: number
+): number {
+  if (totalMembersCount <= 1) return 100;
+  if (transitions.length === 0) {
+    return activeSpeakersCount >= totalMembersCount ? 90 : 60;
+  }
+  const avgPenalty =
+    transitions.reduce((sum, t) => {
+      const excessGap = Math.max(0, t.gapSeconds - 2.5);
+      return sum + Math.min(35, excessGap * 8);
+    }, 0) / transitions.length;
+  return clampPercent(Math.round(100 - avgPenalty));
 }

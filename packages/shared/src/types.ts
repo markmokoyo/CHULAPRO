@@ -129,6 +129,7 @@ export interface TeamMemberProfile {
 export interface TeamMemberReport {
   memberId: string;
   name: string;
+  individualScore?: number;
   speakingSeconds: number;
   speakingSharePercent: number;
   averageSpm: number;
@@ -147,6 +148,8 @@ export interface HandoffTransition {
 
 export interface TeamSessionReport extends SessionReport {
   mode: 'team';
+  teamBalanceScore?: number;
+  handoffScore?: number;
   memberReports: TeamMemberReport[];
   handoffTransitions: HandoffTransition[];
 }
