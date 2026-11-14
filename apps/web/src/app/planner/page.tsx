@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  FileText,
   FileUp,
   ImagePlus,
   Loader2,
@@ -19,8 +20,11 @@ import {
   type SlideItem,
 } from '@cuepulse/shared';
 import {
+  countThaiWords,
+  estimateThaiSyllables,
   parseMultipleImageSlides,
   parseSlideFile,
+  renderTextSlidePreviewDataUrl,
   resizeImageFileToDataUrl,
   type ExtractedSlide,
 } from '@/services/slideParser';
@@ -51,6 +55,9 @@ export default function PlannerPage() {
   >(null);
   const [slideTabs, setSlideTabs] = useState<Record<number, SlideCardTab>>({});
   const [scriptSavedTick, setScriptSavedTick] = useState<number | null>(null);
+  const [inputMode, setInputMode] = useState<'file' | 'text'>('file');
+  const [pastedTitle, setPastedTitle] = useState('');
+  const [pastedScript, setPastedScript] = useState('');
 
   useEffect(() => {
     const existing = listPlans();
@@ -89,6 +96,42 @@ export default function PlannerPage() {
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'ไม่สามารถอ่านไฟล์สไลด์ได้'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTextScriptSubmit = async () => {
+    const clean = pastedScript.trim();
+    if (!clean) {
+      setError('กรุณาวางหรือพิมพ์ข้อความบทพูดก่อนกดสร้างแผน');
+      return;
+    }
+    setError(null);
+    setAiErrorNotice(null);
+    setLoading(true);
+    const titleName = pastedTitle.trim() || 'บทพูดนำเสนอ (ข้อความ)';
+    setFileName(titleName);
+    try {
+      const chunks = clean
+        .split(/\n---+\n|\n\s*\n+/)
+        .map((c) => c.trim())
+        .filter(Boolean);
+      const sections = chunks.length > 0 ? chunks : [clean];
+      const extracted: ExtractedSlide[] = sections.map((chunk, idx) => ({
+        slideNumber: idx + 1,
+        extractedText: chunk,
+        speakerScript: chunk,
+        imageDataUrl: renderTextSlidePreviewDataUrl(idx + 1, chunk),
+        wordCount: countThaiWords(chunk),
+        estimatedSyllables: estimateThaiSyllables(chunk),
+      }));
+      setLastExtractedSlides(extracted);
+      await generatePlan(titleName, extracted);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'ไม่สามารถสร้างแผนจากข้อความได้'
       );
     } finally {
       setLoading(false);
@@ -359,39 +402,134 @@ export default function PlannerPage() {
               </div>
             </div>
 
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#D8C5CB] hover:border-[#EC3D6A] bg-[#FAF6F7] hover:bg-[#FCE8EE]/40 p-6 text-center transition">
-              {loading ? (
-                <Loader2 className="h-7 w-7 animate-spin text-[#EC3D6A]" />
-              ) : (
-                <FileUp className="h-7 w-7 text-[#EC3D6A]" />
-              )}
-              <span className="mt-2 text-sm font-semibold text-[#1F161A] truncate max-w-full">
-                {fileName || 'เลือกไฟล์ .pdf / .pptx / รูปสไลด์'}
-              </span>
-              <span className="mt-1 text-xs text-slate-500">
-                รองรับไฟล์ PDF (แสดงภาพจริงทุกหน้า), PPTX, หรือเลือกหลายรูปภาพพร้อมกัน
-              </span>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    void handleFilesUpload(e.target.files);
-                  }
-                }}
-              />
-            </label>
-
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => void handleDemoSlides()}
-              className="app-press w-full rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] hover:bg-[#FCE8EE] px-4 py-2.5 text-xs font-semibold text-[#1F161A] transition"
+            {/* Mode Switch: Upload Slides vs Paste Script Text */}
+            <div
+              role="tablist"
+              aria-label="วิธีนำเข้าข้อมูล"
+              className="grid grid-cols-2 rounded-xl border border-[#E8DCE0] bg-[#F5EEF0] p-1 text-xs"
             >
-              ใช้ชุดสไลด์ตัวอย่าง (3 หน้า พร้อมภาพและสคริปต์)
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={inputMode === 'file'}
+                onClick={() => setInputMode('file')}
+                className={`rounded-lg py-1.5 font-semibold transition ${
+                  inputMode === 'file'
+                    ? 'bg-white text-[#1F161A] shadow-sm'
+                    : 'text-slate-600 hover:text-[#EC3D6A]'
+                }`}
+              >
+                อัปโหลดไฟล์สไลด์
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={inputMode === 'text'}
+                onClick={() => setInputMode('text')}
+                className={`rounded-lg py-1.5 font-semibold transition ${
+                  inputMode === 'text'
+                    ? 'bg-white text-[#1F161A] shadow-sm'
+                    : 'text-slate-600 hover:text-[#EC3D6A]'
+                }`}
+              >
+                วางบทพูด / ข้อความ
+              </button>
+            </div>
+
+            {inputMode === 'file' ? (
+              <>
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#D8C5CB] hover:border-[#EC3D6A] bg-[#FAF6F7] hover:bg-[#FCE8EE]/40 p-6 text-center transition">
+                  {loading ? (
+                    <Loader2 className="h-7 w-7 animate-spin text-[#EC3D6A]" />
+                  ) : (
+                    <FileUp className="h-7 w-7 text-[#EC3D6A]" />
+                  )}
+                  <span className="mt-2 text-sm font-semibold text-[#1F161A] truncate max-w-full">
+                    {fileName || 'เลือกไฟล์ .pdf / .pptx / รูปสไลด์'}
+                  </span>
+                  <span className="mt-1 text-xs text-slate-500">
+                    รองรับไฟล์ PDF (แสดงภาพจริงทุกหน้า), PPTX, หรือเลือกหลายรูปภาพพร้อมกัน
+                  </span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        void handleFilesUpload(e.target.files);
+                      }
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void handleDemoSlides()}
+                  className="app-press w-full rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] hover:bg-[#FCE8EE] px-4 py-2.5 text-xs font-semibold text-[#1F161A] transition"
+                >
+                  ใช้ชุดสไลด์ตัวอย่าง (3 หน้า พร้อมภาพและสคริปต์)
+                </button>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    ชื่อหัวข้อ / ชื่อบทพูด (ไม่บังคับ)
+                  </label>
+                  <input
+                    type="text"
+                    value={pastedTitle}
+                    onChange={(e) => setPastedTitle(e.target.value)}
+                    placeholder="เช่น บทพูดนำเสนอโครงงาน 5 นาที"
+                    className="w-full rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] px-3 py-2 text-xs sm:text-sm text-[#1F161A] placeholder:text-slate-400 focus:outline-none focus:border-[#EC3D6A]"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+                    <span className="inline-flex items-center gap-1">
+                      <FileText className="h-3.5 w-3.5 text-[#EC3D6A]" />
+                      วางข้อความบทพูดที่นี่
+                    </span>
+                    {pastedScript.trim() && (
+                      <span className="text-[11px] font-medium text-[#BE2257] tabular-nums">
+                        ~{estimateThaiSyllables(pastedScript)} พยางค์ (
+                        {Math.max(
+                          1,
+                          Math.round((estimateThaiSyllables(pastedScript) / 200) * 60)
+                        )}{' '}
+                        วิ)
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    rows={7}
+                    value={pastedScript}
+                    onChange={(e) => setPastedScript(e.target.value)}
+                    placeholder={
+                      'วางบทพูดทั้งหมดที่นี่ได้เลย...\n\nเคล็ดลับ: เว้นบรรทัดว่าง (Enter 2 ครั้ง) เพื่อแบ่งบทพูดออกเป็นช่วงๆ หรือแต่ละสไลด์อัตโนมัติ'
+                    }
+                    className="w-full rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] px-3 py-2.5 text-xs sm:text-sm leading-relaxed text-[#1F161A] placeholder:text-slate-400 focus:outline-none focus:border-[#EC3D6A]"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  disabled={loading || !pastedScript.trim()}
+                  onClick={() => void handleTextScriptSubmit()}
+                  className="app-press w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm disabled:opacity-45"
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4" />
+                  )}
+                  สร้างแผนและแบ่งเวลาจากบทพูดนี้
+                </button>
+              </div>
+            )}
 
             <div className="rounded-xl border border-[#E8DCE0] bg-[#FAF6F7] px-3.5 py-2.5 text-xs text-slate-600 leading-relaxed">
               ต้องการซ้อมพูดแบบไม่มีสไลด์? สามารถกดไปที่หน้า{' '}
