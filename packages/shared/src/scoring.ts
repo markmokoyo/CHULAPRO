@@ -50,7 +50,7 @@ export function calculateOverallScore(params: {
   const pacing = calculatePacingScore(params.averageSpm);
   const fluency = calculateFluencyScore(params.fillerPerMinute);
 
-  const weighted = 0.3 * eye + 0.25 * posture + 0.25 * pacing + 0.2 * fluency;
+  const weighted = 0.35 * fluency + 0.30 * pacing + 0.20 * eye + 0.15 * posture;
   return Math.max(0, Math.min(100, Math.round(weighted)));
 }
 

@@ -33,6 +33,15 @@ describe('Scoring Engine', () => {
       fillerPerMinute: 0,
     });
     expect(perfect).toBe(100);
+
+    // Fluency (35%) + Pacing (30%) + Eye (20%) + Posture (15%)
+    const speechFocused = calculateOverallScore({
+      eyeContactRatio: 0,
+      goodPostureRatio: 0,
+      averageSpm: 200,
+      fillerPerMinute: 0,
+    });
+    expect(speechFocused).toBe(65);
   });
 });
 

@@ -6,8 +6,11 @@ import {
   Camera,
   Eye,
   EyeOff,
+  FileText,
   Gauge,
   Loader2,
+  Maximize2,
+  Minimize2,
   Square,
   UserCheck,
 } from 'lucide-react';
@@ -42,7 +45,13 @@ import { ThaiSpeechRecognizer } from '@/engines/audio/speechRecognition';
 import { WatchSimulatorHUD } from '@/components/studio/WatchSimulatorHUD';
 import { SlideTeleprompter } from '@/components/studio/SlideTeleprompter';
 import { AudiencePanel } from '@/components/studio/AudiencePanel';
+import { CameraEdgeAura } from '@/components/studio/CameraEdgeAura';
 import { getActivePlan, saveSessionReport } from '@/services/storage';
+import {
+  createSessionVideoRecorder,
+  saveSessionVideo,
+  type SessionVideoRecorder,
+} from '@/services/videoStorage';
 
 export default function SoloPracticePage() {
   const router = useRouter();
@@ -65,8 +74,11 @@ export default function SoloPracticePage() {
 
   const [isRunning, setIsRunning] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isFullscreenStage, setIsFullscreenStage] = useState(true);
+  const [showPipPrompt, setShowPipPrompt] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
   const [liveAlertsEnabled, setLiveAlertsEnabled] = useState(true);
+  const [liveAuraReason, setLiveAuraReason] = useState<AlertReason | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   const [elapsedSec, setElapsedSec] = useState(0);
@@ -95,6 +107,16 @@ export default function SoloPracticePage() {
   const showOverlayRef = useRef(showOverlay);
   const slideIdxRef = useRef(slideIdx);
   const slideWarnedRef = useRef<Set<number>>(new Set());
+  const recorderRef = useRef<SessionVideoRecorder | null>(null);
+  const auraTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashAura = useCallback((reason: AlertReason, durationMs = 3200) => {
+    setLiveAuraReason(reason);
+    if (auraTimerRef.current) clearTimeout(auraTimerRef.current);
+    auraTimerRef.current = setTimeout(() => {
+      setLiveAuraReason((curr) => (curr === reason ? null : curr));
+    }, durationMs);
+  }, []);
 
   useEffect(() => {
     liveAlertsRef.current = liveAlertsEnabled;
@@ -122,6 +144,7 @@ export default function SoloPracticePage() {
 
       if (liveAlertsRef.current) {
         setActiveCue(cue);
+        flashAura(reason, 3200);
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
           const pattern =
             cue.pattern === 'SOFT_TICK'
@@ -140,6 +163,10 @@ export default function SoloPracticePage() {
   );
 
   const stopEngines = useCallback(() => {
+    if (auraTimerRef.current) {
+      clearTimeout(auraTimerRef.current);
+      auraTimerRef.current = null;
+    }
     audioRef.current?.stop();
     speechRef.current?.stop();
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -190,6 +217,7 @@ export default function SoloPracticePage() {
           const found = detectLexicalFillers(text, relMs, slideNum, 'solo');
           if (found.length > 0) {
             fillersRef.current.push(...found);
+            flashAura('FILLER_WORD', 3000);
             triggerCue(relMs, 'FILLER_WORD');
           }
           setInterimText('');
@@ -207,6 +235,9 @@ export default function SoloPracticePage() {
       transcriptsRef.current = [];
       slideWarnedRef.current.clear();
       cooldownRef.current.reset();
+      recorderRef.current = createSessionVideoRecorder(stream);
+      setLiveAuraReason(null);
+      setIsFullscreenStage(true);
       setElapsedSec(0);
       setSlideElapsedSec(0);
       setIsRunning(true);
@@ -303,13 +334,16 @@ export default function SoloPracticePage() {
           slideNumber: slideNum,
           speakerId: 'solo',
         });
+        flashAura('FILLER_WORD', 3000);
         triggerCue(relMs, 'FILLER_WORD');
       }
 
-      // Sustained rule checks
+      // Sustained rule checks (drive both haptic cues and edge aura with identical thresholds)
+      let sustainedReason: AlertReason | null = null;
       if (visionMetrics.eyeContactScore < 0.55) {
         eyeLostSinceRef.current ??= relMs;
         if (relMs - eyeLostSinceRef.current >= VISION_RULES.EYE_CONTACT_LOST_SUSTAIN_MS) {
+          sustainedReason = 'EYE_CONTACT_LOST';
           triggerCue(relMs, 'EYE_CONTACT_LOST');
           eyeLostSinceRef.current = relMs;
         }
@@ -320,6 +354,7 @@ export default function SoloPracticePage() {
       if (visionMetrics.isSlouching || visionMetrics.isArmsCrossed) {
         badPostureSinceRef.current ??= relMs;
         if (relMs - badPostureSinceRef.current >= VISION_RULES.BAD_POSTURE_SUSTAIN_MS) {
+          sustainedReason ??= 'BAD_POSTURE';
           triggerCue(relMs, 'BAD_POSTURE');
           badPostureSinceRef.current = relMs;
         }
@@ -330,11 +365,16 @@ export default function SoloPracticePage() {
       if (audioMetrics.currentSpm > SPM_THRESHOLDS.TOO_FAST) {
         fastSinceRef.current ??= relMs;
         if (relMs - fastSinceRef.current >= SPM_THRESHOLDS.FAST_SUSTAIN_MS) {
+          sustainedReason ??= 'SPEAKING_TOO_FAST';
           triggerCue(relMs, 'SPEAKING_TOO_FAST');
           fastSinceRef.current = relMs;
         }
       } else {
         fastSinceRef.current = null;
+      }
+
+      if (sustainedReason) {
+        flashAura(sustainedReason, 3200);
       }
 
       timelineRef.current.push({
@@ -378,12 +418,19 @@ export default function SoloPracticePage() {
     };
   }, [isRunning, plan, triggerCue]);
 
-  const finishAndSave = () => {
+  const finishAndSave = async () => {
+    const recordedBlob = recorderRef.current ? await recorderRef.current.stop() : null;
+    recorderRef.current = null;
     stopEngines();
     setIsRunning(false);
+    setLiveAuraReason(null);
     const activePlan = useSlides ? plan : null;
+    const sessionId = `solo-${Date.now()}`;
+    if (recordedBlob) {
+      await saveSessionVideo(sessionId, recordedBlob);
+    }
     const report = buildSessionReport({
-      sessionId: `solo-${Date.now()}`,
+      sessionId,
       planId: activePlan?.id,
       topicTitle: !activePlan ? freeformTopic.trim() || undefined : undefined,
       speakerScript: !activePlan ? freeformScript.trim() || undefined : undefined,
@@ -455,7 +502,7 @@ export default function SoloPracticePage() {
           ) : (
             <button
               type="button"
-              onClick={finishAndSave}
+              onClick={() => void finishAndSave()}
               className="app-press flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-sm font-bold text-white shadow-sm"
             >
               <Square className="h-4 w-4" />
@@ -474,7 +521,13 @@ export default function SoloPracticePage() {
       <div className="grid gap-5 lg:grid-cols-12">
         {/* Left: Camera + Live Metrics */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-slate-900 shadow-sm">
+          <div
+            className={
+              isRunning && isFullscreenStage
+                ? 'fixed inset-0 z-50 bg-slate-950 flex items-center justify-center overflow-hidden'
+                : 'relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-slate-900 shadow-sm'
+            }
+          >
             <video
               ref={videoRef}
               muted
@@ -486,23 +539,116 @@ export default function SoloPracticePage() {
               className="pointer-events-none absolute inset-0 h-full w-full -scale-x-100"
             />
 
+            {isRunning && (
+              <CameraEdgeAura reason={activeCue?.reason ?? liveAuraReason} />
+            )}
+
             {/* Native Camera Floating HUD Pills */}
-            <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex items-center justify-between gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    isRunning ? 'bg-rose-500 animate-pulse' : 'bg-[#FF8FAB]'
-                  }`}
-                />
-                {isRunning ? `กำลังบันทึกซ้อม • ${mm}:${ss}` : 'เตรียมพร้อมเปิดกล้อง'}
+            <div className="absolute inset-x-3 top-3 sm:inset-x-5 sm:top-4 z-30 flex flex-wrap items-center justify-between gap-2">
+              <div className="pointer-events-none flex items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isRunning ? 'bg-rose-500 animate-pulse' : 'bg-[#FF8FAB]'
+                    }`}
+                  />
+                  {isRunning ? `กำลังบันทึกวิดีโอ • ${mm}:${ss}` : 'เตรียมพร้อมเปิดกล้อง'}
+                </div>
+
+                {activePlan && (
+                  <div className="inline-flex items-center rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-[#BE2257] shadow-sm backdrop-blur-sm">
+                    สไลด์ {slideIdx + 1} / {activePlan.slides.length}
+                  </div>
+                )}
               </div>
 
-              {activePlan && (
-                <div className="inline-flex items-center rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold text-[#BE2257] shadow-sm backdrop-blur-sm">
-                  สไลด์ {slideIdx + 1} / {activePlan.slides.length}
+              {isRunning && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {isFullscreenStage && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPipPrompt((v) => !v)}
+                      className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-[#FF8FAB]" />
+                      {showPipPrompt ? 'ซ่อนสไลด์/สคริปต์' : 'ดูสไลด์/สคริปต์'}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowOverlay((v) => !v)}
+                    className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                  >
+                    {showOverlay ? (
+                      <Eye className="h-3.5 w-3.5 text-[#FF8FAB]" />
+                    ) : (
+                      <EyeOff className="h-3.5 w-3.5 text-slate-300" />
+                    )}
+                    เส้นโครง
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreenStage((v) => !v)}
+                    className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                  >
+                    {isFullscreenStage ? (
+                      <>
+                        <Minimize2 className="h-3.5 w-3.5" />
+                        ย่อหน้าต่าง
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        เต็มจอ
+                      </>
+                    )}
+                  </button>
+
+                  {isFullscreenStage && (
+                    <button
+                      type="button"
+                      onClick={() => void finishAndSave()}
+                      className="app-press inline-flex items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg"
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                      จบการซ้อม & ดูผลคะแนน
+                    </button>
+                  )}
                 </div>
               )}
             </div>
+
+            {/* Optional Picture-in-Picture Slide / Script Card during Fullscreen */}
+            {isRunning && isFullscreenStage && showPipPrompt && (
+              <div className="absolute bottom-16 right-4 z-30 w-80 max-w-[90vw] max-h-[60vh] overflow-y-auto rounded-2xl shadow-2xl">
+                <SlideTeleprompter
+                  plan={activePlan}
+                  currentSlideIndex={slideIdx}
+                  slideElapsedSeconds={slideElapsedSec}
+                  onPrevSlide={() => setSlideIdx((i) => Math.max(0, i - 1))}
+                  onNextSlide={() =>
+                    setSlideIdx((i) =>
+                      activePlan ? Math.min(activePlan.slides.length - 1, i + 1) : i
+                    )
+                  }
+                  onSelectSlide={(idx) => setSlideIdx(idx)}
+                  freeformTopic={freeformTopic}
+                  onChangeFreeformTopic={setFreeformTopic}
+                  freeformScript={freeformScript}
+                  onChangeFreeformScript={setFreeformScript}
+                />
+              </div>
+            )}
+
+            {/* Live transcript caption in fullscreen stage */}
+            {isRunning && isFullscreenStage && interimText && (
+              <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 z-30 max-w-2xl rounded-full bg-slate-900/80 px-4 py-2 text-xs text-white backdrop-blur-md shadow-lg">
+                <span className="text-[#FF8FAB] font-semibold">กำลังพูด: </span>
+                {interimText}
+              </div>
+            )}
 
             {!isRunning && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FAF6F7]/95 backdrop-blur-sm text-center p-6">
@@ -515,14 +661,15 @@ export default function SoloPracticePage() {
                   จัดใบหน้าให้อยู่ในกรอบ แล้วกด &ldquo;เริ่มซ้อม&rdquo;
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  ช่วง 3 วินาทีแรกระบบจะปรับเทียบท่ายืน/ท่านั่งปกติอัตโนมัติ
+                  เมื่อเริ่มซ้อมระบบจะขยายกล้องเต็มจอและบันทึกวิดีโออัตโนมัติ แล้วสรุปคะแนนหลังพูดจบ
                 </p>
               </div>
             )}
           </div>
 
-          {/* Live Gauges */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Show Live Gauges only when not running so speaker isn't distracted; scores appear in Report */}
+          {!isRunning ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="app-card rounded-2xl border border-[#E8DCE0] bg-white p-3.5 shadow-sm space-y-2">
               <div className="flex items-center justify-between gap-1">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
@@ -615,6 +762,11 @@ export default function SoloPracticePage() {
               </div>
             </div>
           </div>
+          ) : (
+            <div className="rounded-xl border border-[#E8DCE0] bg-white px-4 py-3 text-xs text-slate-600 shadow-sm">
+              กำลังบันทึกวิดีโอและวิเคราะห์การพูดอยู่เบื้องหลัง — คะแนนทั้งหมดจะสรุปให้ดูหลังกดจบการซ้อม
+            </div>
+          )}
 
           {interimText && (
             <div className="rounded-xl border border-[#E8DCE0] bg-white px-4 py-2.5 text-xs text-slate-700 shadow-sm">

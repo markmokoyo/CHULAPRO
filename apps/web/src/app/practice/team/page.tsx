@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, Loader2, Plus, Square, Trash2, Users } from 'lucide-react';
+import {
+  Camera,
+  FileText,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Square,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import {
   buildTeamSessionReport,
   CooldownManager,
@@ -27,7 +37,13 @@ import { WebAudioProsodyEngine } from '@/engines/audio/audioAnalyzer';
 import { ThaiSpeechRecognizer } from '@/engines/audio/speechRecognition';
 import { WatchSimulatorHUD } from '@/components/studio/WatchSimulatorHUD';
 import { SlideTeleprompter } from '@/components/studio/SlideTeleprompter';
+import { CameraEdgeAura } from '@/components/studio/CameraEdgeAura';
 import { getActivePlan, saveSessionReport } from '@/services/storage';
+import {
+  createSessionVideoRecorder,
+  saveSessionVideo,
+  type SessionVideoRecorder,
+} from '@/services/videoStorage';
 
 export default function TeamPracticePage() {
   const router = useRouter();
@@ -68,6 +84,9 @@ export default function TeamPracticePage() {
   const [activeCue, setActiveCue] = useState<HapticCueEvent | null>(null);
   const [cooldownRemainingMs, setCooldownRemainingMs] = useState(0);
   const [liveAlertsEnabled, setLiveAlertsEnabled] = useState(true);
+  const [isFullscreenStage, setIsFullscreenStage] = useState(true);
+  const [showPipPrompt, setShowPipPrompt] = useState(false);
+  const [liveAuraReason, setLiveAuraReason] = useState<AlertReason | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const sessionStartRef = useRef(0);
@@ -78,6 +97,16 @@ export default function TeamPracticePage() {
   const activeSpeakerRef = useRef<string | undefined>(undefined);
   const liveAlertsRef = useRef(liveAlertsEnabled);
   const slideIdxRef = useRef(slideIdx);
+  const recorderRef = useRef<SessionVideoRecorder | null>(null);
+  const auraTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashAura = useCallback((reason: AlertReason, durationMs = 3200) => {
+    setLiveAuraReason(reason);
+    if (auraTimerRef.current) clearTimeout(auraTimerRef.current);
+    auraTimerRef.current = setTimeout(() => {
+      setLiveAuraReason((curr) => (curr === reason ? null : curr));
+    }, durationMs);
+  }, []);
 
   useEffect(() => {
     liveAlertsRef.current = liveAlertsEnabled;
@@ -100,15 +129,20 @@ export default function TeamPracticePage() {
       cuesRef.current.push(cue);
       if (liveAlertsRef.current) {
         setActiveCue(cue);
+        flashAura(reason, 3200);
         setTimeout(() => {
           setActiveCue((curr) => (curr?.id === cue.id ? null : curr));
         }, 3200);
       }
     },
-    [plan]
+    [plan, flashAura]
   );
 
   const stopAll = useCallback(() => {
+    if (auraTimerRef.current) {
+      clearTimeout(auraTimerRef.current);
+      auraTimerRef.current = null;
+    }
     audioRef.current?.stop();
     speechRef.current?.stop();
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -189,6 +223,7 @@ export default function TeamPracticePage() {
           const found = detectLexicalFillers(text, relMs, slideNum, speaker);
           if (found.length > 0) {
             fillersRef.current.push(...found);
+            flashAura('FILLER_WORD', 3000);
             triggerCue(relMs, 'FILLER_WORD');
           }
         },
@@ -202,6 +237,9 @@ export default function TeamPracticePage() {
       transcriptsRef.current = [];
       lipTrackerRef.current.reset();
       cooldownRef.current.reset();
+      recorderRef.current = createSessionVideoRecorder(stream);
+      setLiveAuraReason(null);
+      setIsFullscreenStage(true);
     } catch (err) {
       setError(
         err instanceof Error
@@ -263,6 +301,7 @@ export default function TeamPracticePage() {
           slideNumber: slideNum,
           speakerId: detectedSpeaker ?? activeSpeakerRef.current ?? members[0]?.memberId,
         });
+        flashAura('FILLER_WORD', 3000);
         triggerCue(relMs, 'FILLER_WORD');
       }
 
@@ -301,11 +340,18 @@ export default function TeamPracticePage() {
     };
   }, [step, members, plan, triggerCue]);
 
-  const finishTeamSession = () => {
+  const finishTeamSession = async () => {
+    const recordedBlob = recorderRef.current ? await recorderRef.current.stop() : null;
+    recorderRef.current = null;
     stopAll();
+    setLiveAuraReason(null);
     const activePlan = useSlides ? plan : null;
+    const sessionId = `team-${Date.now()}`;
+    if (recordedBlob) {
+      await saveSessionVideo(sessionId, recordedBlob);
+    }
     const report = buildTeamSessionReport({
-      sessionId: `team-${Date.now()}`,
+      sessionId,
       planId: activePlan?.id,
       topicTitle: !activePlan ? freeformTopic.trim() || undefined : undefined,
       speakerScript: !activePlan ? freeformScript.trim() || undefined : undefined,
@@ -339,7 +385,7 @@ export default function TeamPracticePage() {
         {step === 'practice' && (
           <button
             type="button"
-            onClick={finishTeamSession}
+            onClick={() => void finishTeamSession()}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-sm font-bold text-white shadow-sm"
           >
             <Square className="h-4 w-4" />
@@ -432,7 +478,13 @@ export default function TeamPracticePage() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-12">
           <div className="lg:col-span-7 space-y-4">
-            <div className="relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-slate-900 shadow-sm">
+            <div
+              className={
+                isFullscreenStage
+                  ? 'fixed inset-0 z-50 bg-slate-950 flex items-center justify-center overflow-hidden'
+                  : 'relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-slate-900 shadow-sm'
+              }
+            >
               <video
                 ref={videoRef}
                 muted
@@ -443,10 +495,84 @@ export default function TeamPracticePage() {
                 ref={canvasRef}
                 className="pointer-events-none absolute inset-0 h-full w-full -scale-x-100"
               />
-              <div className="absolute left-3 top-3 sm:left-4 sm:top-4 rounded-xl bg-white/95 border border-[#E8DCE0] px-3.5 py-2 text-xs shadow-sm">
-                <span className="text-slate-500">ผู้พูดปัจจุบัน: </span>
-                <span className="font-bold text-[#BE2257]">{activeMemberName}</span>
+
+              <CameraEdgeAura reason={activeCue?.reason ?? liveAuraReason} />
+
+              <div className="absolute inset-x-3 top-3 sm:inset-x-5 sm:top-4 z-30 flex flex-wrap items-center justify-between gap-2">
+                <div className="pointer-events-none flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                    <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                    กำลังบันทึกวิดีโอ • {String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:{String(elapsedSec % 60).padStart(2, '0')}
+                  </div>
+                  <div className="rounded-full bg-white/95 border border-[#E8DCE0] px-3 py-1.5 text-xs shadow-sm">
+                    <span className="text-slate-500">ผู้พูดปัจจุบัน: </span>
+                    <span className="font-bold text-[#BE2257]">{activeMemberName}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {isFullscreenStage && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPipPrompt((v) => !v)}
+                      className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-[#FF8FAB]" />
+                      {showPipPrompt ? 'ซ่อนสไลด์/สคริปต์' : 'ดูสไลด์/สคริปต์'}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreenStage((v) => !v)}
+                    className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                  >
+                    {isFullscreenStage ? (
+                      <>
+                        <Minimize2 className="h-3.5 w-3.5" />
+                        ย่อหน้าต่าง
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        เต็มจอ
+                      </>
+                    )}
+                  </button>
+
+                  {isFullscreenStage && (
+                    <button
+                      type="button"
+                      onClick={() => void finishTeamSession()}
+                      className="app-press inline-flex items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg"
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                      จบซ้อมทีม & ดูผล
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {isFullscreenStage && showPipPrompt && (
+                <div className="absolute bottom-16 right-4 z-30 w-80 max-w-[90vw] max-h-[60vh] overflow-y-auto rounded-2xl shadow-2xl">
+                  <SlideTeleprompter
+                    plan={activePlan}
+                    currentSlideIndex={slideIdx}
+                    slideElapsedSeconds={slideElapsedSec}
+                    onPrevSlide={() => setSlideIdx((i) => Math.max(0, i - 1))}
+                    onNextSlide={() =>
+                      setSlideIdx((i) =>
+                        activePlan ? Math.min(activePlan.slides.length - 1, i + 1) : i
+                      )
+                    }
+                    onSelectSlide={(idx) => setSlideIdx(idx)}
+                    freeformTopic={freeformTopic}
+                    onChangeFreeformTopic={setFreeformTopic}
+                    freeformScript={freeformScript}
+                    onChangeFreeformScript={setFreeformScript}
+                  />
+                </div>
+              )}
             </div>
           </div>
 

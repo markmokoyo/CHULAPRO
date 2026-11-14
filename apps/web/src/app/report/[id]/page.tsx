@@ -33,6 +33,7 @@ import type { AiQuotaSnapshot } from '@/services/geminiQuota';
 import { ScoreOverview } from '@/components/report/ScoreOverview';
 import { TimelineChart } from '@/components/report/TimelineChart';
 import { TeamBreakdown } from '@/components/report/TeamBreakdown';
+import { SessionVideoPlayer } from '@/components/report/SessionVideoPlayer';
 import { speakQuestionNatural, stopSpeaking } from '@/services/voicePlayer';
 
 interface BrowserSpeechRecognition {
@@ -391,6 +392,12 @@ export default function ReportDetailPage() {
       </div>
 
       <ScoreOverview report={report} />
+
+      <SessionVideoPlayer
+        sessionId={report.sessionId}
+        hapticCues={report.hapticCues}
+        fillers={report.fillers}
+      />
 
       {/* Slide-Free Speech Structure Analysis Card */}
       {(!plan || report.speechAnalysis) && (

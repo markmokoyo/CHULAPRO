@@ -234,10 +234,10 @@ export interface AudienceMessage {
 ### 3.5 Overall Score Formula (0–100)
 ```text
 OverallScore =
-  (0.30 × EyeContactRatio) +
-  (0.25 × GoodPostureRatio) +
-  (0.25 × PacingScore) +        // 100 เมื่ออยู่ในช่วง 180-220 SPM, ลดหลั่นตามระยะห่าง
-  (0.20 × FluencyScore)         // max(0, 100 - (FillerPerMinute × 12))
+  (0.35 × FluencyScore) +       // max(0, 100 - (FillerPerMinute × 12))
+  (0.30 × PacingScore) +        // 100 เมื่ออยู่ในช่วง 180-220 SPM, ลดหลั่นตามระยะห่าง
+  (0.20 × EyeContactRatio) +    // คำนวณจาก Iris Gaze (468/473) + Head Pitch/Yaw
+  (0.15 × GoodPostureRatio)
 ```
 
 ---

@@ -59,37 +59,82 @@ export function analyzePostureAndGaze(params: {
   let isArmsCrossed = false;
   let isSwaying = false;
 
-  // 1. Face / Eye Contact analysis (478 landmarks)
+  // 1. Face / Eye Contact analysis (478 landmarks including iris 468, 473)
   if (params.face && params.face.length >= 468) {
-    const noseTip = params.face[1];
-    const leftCheek = params.face[234];
-    const rightCheek = params.face[454];
-    const forehead = params.face[10];
-    const chin = params.face[152];
+    const face = params.face;
+    const noseTip = face[1];
+    const leftCheek = face[234];
+    const rightCheek = face[454];
+    const forehead = face[10];
+    const chin = face[152];
+    const leftEyeOuter = face[33];
+    const rightEyeOuter = face[263];
 
     const faceWidth = Math.max(0.05, Math.abs(rightCheek.x - leftCheek.x));
     const faceCenterX = (leftCheek.x + rightCheek.x) / 2;
     const yawOffset = Math.abs(noseTip.x - faceCenterX) / faceWidth;
     const estimatedYawDeg = yawOffset * 90;
 
+    // Head pitch using nose tip relative to eye line (avoids center-of-face bias when looking up)
     const faceHeight = Math.max(0.05, Math.abs(chin.y - forehead.y));
-    const faceMidY = (forehead.y + chin.y) / 2;
-    const pitchOffset = Math.abs(noseTip.y - faceMidY) / faceHeight;
-    const estimatedPitchDeg = pitchOffset * 70;
+    const eyeLineY = (leftEyeOuter.y + rightEyeOuter.y) / 2;
+    const noseBelowEyesRatio = (noseTip.y - eyeLineY) / faceHeight;
+    const neutralNoseRatio = 0.23;
+    const pitchDeviation = Math.abs(noseBelowEyesRatio - neutralNoseRatio);
+    const estimatedPitchDeg = pitchDeviation * 140;
+
+    // Iris gaze tracking (available when FaceLandmarker outputs 478 landmarks)
+    let irisPenalty = 0;
+    if (face.length >= 478) {
+      const computeEyeGazeDeviation = (
+        outerIdx: number,
+        innerIdx: number,
+        upperIdx: number,
+        lowerIdx: number,
+        irisIdx: number
+      ) => {
+        const outer = face[outerIdx];
+        const inner = face[innerIdx];
+        const upper = face[upperIdx];
+        const lower = face[lowerIdx];
+        const iris = face[irisIdx];
+
+        const eyeWidth = Math.max(0.008, Math.abs(inner.x - outer.x));
+        const minX = Math.min(outer.x, inner.x);
+        const hRatio = (iris.x - minX) / eyeWidth; // ~0.5 when centered
+        const hDev = Math.max(0, Math.abs(hRatio - 0.5) - 0.1);
+
+        const cornerMidY = (outer.y + inner.y) / 2;
+        const vCornerOffset = Math.abs(iris.y - cornerMidY) / eyeWidth;
+        const eyeOpenH = Math.max(0.004, Math.abs(lower.y - upper.y));
+        const lidRatio = (iris.y - upper.y) / eyeOpenH; // ~0.5 centered, <0.35 looking up, >0.65 looking down
+        const vLidDev = Math.max(0, Math.abs(lidRatio - 0.5) - 0.12);
+        const vCornerDev = Math.max(0, vCornerOffset - 0.055);
+
+        return Math.max(hDev * 2.6, vCornerDev * 3.8, vLidDev * 2.2);
+      };
+
+      const leftDev = computeEyeGazeDeviation(33, 133, 159, 145, 468);
+      const rightDev = computeEyeGazeDeviation(263, 362, 386, 374, 473);
+      irisPenalty = Math.min(0.85, (leftDev + rightDev) / 2);
+    }
 
     const yawOk = estimatedYawDeg <= VISION_RULES.EYE_CONTACT_YAW_DEG;
     const pitchOk = estimatedPitchDeg <= VISION_RULES.EYE_CONTACT_PITCH_DEG;
 
+    let headPenalty = 0;
     if (!yawOk || !pitchOk) {
-      const penalty = Math.min(
-        1,
+      headPenalty = Math.min(
+        0.9,
         Math.max(
-          estimatedYawDeg / (VISION_RULES.EYE_CONTACT_YAW_DEG * 2),
-          estimatedPitchDeg / (VISION_RULES.EYE_CONTACT_PITCH_DEG * 2)
+          yawOk ? 0 : estimatedYawDeg / (VISION_RULES.EYE_CONTACT_YAW_DEG * 1.8),
+          pitchOk ? 0 : estimatedPitchDeg / (VISION_RULES.EYE_CONTACT_PITCH_DEG * 1.6)
         )
       );
-      eyeContactScore = Math.max(0.1, Number((1 - penalty).toFixed(2)));
     }
+
+    const totalPenalty = Math.min(0.9, Math.max(headPenalty, irisPenalty));
+    eyeContactScore = Math.max(0.1, Number((1 - totalPenalty).toFixed(2)));
   } else if (!params.face) {
     eyeContactScore = 0.2;
   }
