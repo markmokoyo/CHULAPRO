@@ -56,6 +56,10 @@ export default function SoloPracticePage() {
   const cooldownRef = useRef<CooldownManager>(new CooldownManager(20_000));
 
   const [plan, setPlan] = useState<PresentationPlan | null>(null);
+  const [useSlides, setUseSlides] = useState(true);
+  const [freeformTopic, setFreeformTopic] = useState('');
+  const [freeformScript, setFreeformScript] = useState('');
+  const [rightTab, setRightTab] = useState<'prompt' | 'audience'>('prompt');
   const [slideIdx, setSlideIdx] = useState(0);
   const [slideElapsedSec, setSlideElapsedSec] = useState(0);
 
@@ -377,9 +381,12 @@ export default function SoloPracticePage() {
   const finishAndSave = () => {
     stopEngines();
     setIsRunning(false);
+    const activePlan = useSlides ? plan : null;
     const report = buildSessionReport({
       sessionId: `solo-${Date.now()}`,
-      planId: plan?.id,
+      planId: activePlan?.id,
+      topicTitle: !activePlan ? freeformTopic.trim() || undefined : undefined,
+      speakerScript: !activePlan ? freeformScript.trim() || undefined : undefined,
       durationSeconds: Math.max(1, elapsedSec),
       telemetryTimeline: timelineRef.current,
       fillers: fillersRef.current,
@@ -391,7 +398,8 @@ export default function SoloPracticePage() {
     router.push(`/report/${report.sessionId}`);
   };
 
-  const currentSlide = plan?.slides[slideIdx];
+  const activePlan = useSlides ? plan : null;
+  const currentSlide = activePlan?.slides[slideIdx];
   const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
   const ss = String(elapsedSec % 60).padStart(2, '0');
   const spmStatus =
@@ -489,20 +497,22 @@ export default function SoloPracticePage() {
                 {isRunning ? `กำลังบันทึกซ้อม • ${mm}:${ss}` : 'เตรียมพร้อมเปิดกล้อง'}
               </div>
 
-              {plan && (
+              {activePlan && (
                 <div className="inline-flex items-center rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold text-[#BE2257] shadow-sm backdrop-blur-sm">
-                  สไลด์ {slideIdx + 1} / {plan.slides.length}
+                  สไลด์ {slideIdx + 1} / {activePlan.slides.length}
                 </div>
               )}
             </div>
 
             {!isRunning && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FAF6F7]/95 backdrop-blur-sm text-center p-6">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FCE8EE] text-[#EC3D6A] mb-3 border border-[#E8DCE0]">
-                  <Camera className="h-7 w-7" />
-                </div>
+                <img
+                  src="/images/camera-guide.svg"
+                  alt="กรอบจัดตำแหน่งหน้ากล้อง"
+                  className="w-52 sm:w-64 h-auto mb-3"
+                />
                 <p className="text-sm font-bold text-[#1F161A]">
-                  กด &ldquo;เริ่มซ้อม&rdquo; เพื่อเปิดกล้องและไมโครโฟน
+                  จัดใบหน้าให้อยู่ในกรอบ แล้วกด &ldquo;เริ่มซ้อม&rdquo;
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   ช่วง 3 วินาทีแรกระบบจะปรับเทียบท่ายืน/ท่านั่งปกติอัตโนมัติ
@@ -614,7 +624,7 @@ export default function SoloPracticePage() {
           )}
         </div>
 
-        {/* Right: Watch Simulator + Slide Teleprompter + AI Audience */}
+        {/* Right: Watch Simulator + Clean Tabbed Studio Panel */}
         <div className="lg:col-span-5 space-y-4">
           <WatchSimulatorHUD
             activeCue={activeCue}
@@ -623,33 +633,88 @@ export default function SoloPracticePage() {
             onToggleLiveAlerts={() => setLiveAlertsEnabled((v) => !v)}
           />
 
-          <SlideTeleprompter
-            plan={plan}
-            currentSlideIndex={slideIdx}
-            slideElapsedSeconds={slideElapsedSec}
-            onPrevSlide={() => setSlideIdx((i) => Math.max(0, i - 1))}
-            onNextSlide={() =>
-              setSlideIdx((i) =>
-                plan ? Math.min(plan.slides.length - 1, i + 1) : i
-              )
-            }
-          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div
+              role="tablist"
+              aria-label="แผงควบคุมฝั่งขวา"
+              className="inline-flex rounded-xl border border-[#E8DCE0] bg-[#F5EEF0] p-1 text-xs"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={rightTab === 'prompt'}
+                onClick={() => setRightTab('prompt')}
+                className={`rounded-lg px-3 py-1.5 font-semibold transition ${
+                  rightTab === 'prompt'
+                    ? 'bg-white text-[#1F161A] shadow-sm'
+                    : 'text-slate-600 hover:text-[#EC3D6A]'
+                }`}
+              >
+                สไลด์และสคริปต์
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={rightTab === 'audience'}
+                onClick={() => setRightTab('audience')}
+                className={`rounded-lg px-3 py-1.5 font-semibold transition ${
+                  rightTab === 'audience'
+                    ? 'bg-white text-[#1F161A] shadow-sm'
+                    : 'text-slate-600 hover:text-[#EC3D6A]'
+                }`}
+              >
+                จำลองคำถามผู้ฟัง
+              </button>
+            </div>
 
-          <AudiencePanel
-            personaId={personaId}
-            onChangePersona={setPersonaId}
-            slideContext={
-              currentSlide?.extractedText || 'การนำเสนอโปรเจกต์ CuePulse AI'
-            }
-            recentTranscript={
-              transcriptsRef.current
-                .slice(-3)
-                .map((t) => t.text)
-                .join(' ') || interimText
-            }
-            messages={audienceMessages}
-            onNewMessage={(m) => setAudienceMessages((prev) => [m, ...prev])}
-          />
+            {plan && (
+              <button
+                type="button"
+                onClick={() => setUseSlides((v) => !v)}
+                className="rounded-lg border border-[#D8C5CB] bg-white hover:bg-[#FCE8EE] px-2.5 py-1.5 text-[11px] font-semibold text-[#1F161A] transition"
+              >
+                {useSlides ? 'ซ้อมแบบไม่ใช้สไลด์' : 'กลับมาใช้แผนสไลด์'}
+              </button>
+            )}
+          </div>
+
+          {rightTab === 'prompt' ? (
+            <SlideTeleprompter
+              plan={activePlan}
+              currentSlideIndex={slideIdx}
+              slideElapsedSeconds={slideElapsedSec}
+              onPrevSlide={() => setSlideIdx((i) => Math.max(0, i - 1))}
+              onNextSlide={() =>
+                setSlideIdx((i) =>
+                  activePlan ? Math.min(activePlan.slides.length - 1, i + 1) : i
+                )
+              }
+              onSelectSlide={(idx) => setSlideIdx(idx)}
+              freeformTopic={freeformTopic}
+              onChangeFreeformTopic={setFreeformTopic}
+              freeformScript={freeformScript}
+              onChangeFreeformScript={setFreeformScript}
+            />
+          ) : (
+            <AudiencePanel
+              personaId={personaId}
+              onChangePersona={setPersonaId}
+              slideContext={
+                currentSlide?.extractedText ||
+                freeformTopic ||
+                freeformScript ||
+                'การซ้อมนำเสนอปากเปล่า'
+              }
+              recentTranscript={
+                transcriptsRef.current
+                  .slice(-3)
+                  .map((t) => t.text)
+                  .join(' ') || interimText
+              }
+              messages={audienceMessages}
+              onNewMessage={(m) => setAudienceMessages((prev) => [m, ...prev])}
+            />
+          )}
         </div>
       </div>
     </div>

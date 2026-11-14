@@ -34,9 +34,32 @@ export function getAiRequestHeaders(): Record<string, string> {
 export function savePlan(plan: PresentationPlan): void {
   if (!isBrowser()) return;
   const existing = listPlans().filter((p) => p.id !== plan.id);
-  const updated = [plan, ...existing].slice(0, 20);
-  localStorage.setItem(PLANS_KEY, JSON.stringify(updated));
-  localStorage.setItem(ACTIVE_PLAN_KEY, plan.id);
+  const updated = [plan, ...existing].slice(0, 12);
+  try {
+    localStorage.setItem(PLANS_KEY, JSON.stringify(updated));
+    localStorage.setItem(ACTIVE_PLAN_KEY, plan.id);
+  } catch {
+    // If QuotaExceededError happens due to base64 slide images on older plans, strip images from older plans first
+    const trimmedOld = updated.map((p, idx) =>
+      idx === 0
+        ? p
+        : {
+            ...p,
+            slides: p.slides.map((s) => ({ ...s, imageDataUrl: undefined })),
+          }
+    );
+    try {
+      localStorage.setItem(PLANS_KEY, JSON.stringify(trimmedOld.slice(0, 6)));
+      localStorage.setItem(ACTIVE_PLAN_KEY, plan.id);
+    } catch {
+      const barePlan: PresentationPlan = {
+        ...plan,
+        slides: plan.slides.map((s) => ({ ...s, imageDataUrl: undefined })),
+      };
+      localStorage.setItem(PLANS_KEY, JSON.stringify([barePlan]));
+      localStorage.setItem(ACTIVE_PLAN_KEY, plan.id);
+    }
+  }
 }
 
 export function listPlans(): PresentationPlan[] {

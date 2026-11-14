@@ -18,10 +18,10 @@ import {
   AUDIENCE_PERSONAS,
   type AudienceMessage,
   type PresentationPlan,
+  type SpeechContentAnalysis,
   type TeamSessionReport,
 } from '@cuepulse/shared';
 import {
-  getActivePlan,
   getAiRequestHeaders,
   getSessionReportById,
   listPlans,
@@ -51,6 +51,7 @@ export default function ReportDetailPage() {
   const [report, setReport] = useState<AnySessionReport | null>(null);
   const [plan, setPlan] = useState<PresentationPlan | null>(null);
   const [judgeLoading, setJudgeLoading] = useState(false);
+  const [speechAnalysisLoading, setSpeechAnalysisLoading] = useState(false);
   const [judgeSource, setJudgeSource] = useState<string | null>(null);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
@@ -60,6 +61,7 @@ export default function ReportDetailPage() {
   const [voiceMode, setVoiceMode] = useState<'gemini' | 'browser'>('gemini');
 
   const autoRequestedRef = useRef(false);
+  const autoSpeechRequestedRef = useRef(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
 
   useEffect(() => {
@@ -83,10 +85,64 @@ export default function ReportDetailPage() {
           )
           .join('\n\n');
       }
-      return `การนำเสนอความยาว ${rep.durationSeconds} วินาที`;
+      const parts: string[] = [];
+      if (rep.topicTitle) parts.push(`หัวข้อที่พูด: ${rep.topicTitle}`);
+      if (rep.speakerScript) parts.push(`สคริปต์ที่เตรียม: ${rep.speakerScript.slice(0, 600)}`);
+      if (rep.speechAnalysis?.detectedTopic) {
+        parts.push(`ใจความหลักจากคำพูด: ${rep.speechAnalysis.detectedTopic}`);
+      }
+      parts.push(`การซ้อมพูดปากเปล่า ความยาว ${rep.durationSeconds} วินาที`);
+      return parts.join('\n');
     },
     []
   );
+
+  const generateSpeechAnalysis = useCallback(async (rep: AnySessionReport) => {
+    setSpeechAnalysisLoading(true);
+    try {
+      const transcriptText = rep.transcriptSegments.map((t) => t.text).join(' ');
+      const metricsSummary = `ความเร็วเฉลี่ย ${rep.metrics.averageSpm} พยางค์/นาที, คำติดปาก ${rep.metrics.fillerCount} ครั้ง, สบตาผู้ฟัง ${rep.metrics.eyeContactRatio}%, บุคลิกภาพ ${rep.metrics.goodPostureRatio}%, คะแนนรวม ${rep.overallScore}/100`;
+
+      const res = await fetch('/api/audience', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAiRequestHeaders(),
+        },
+        body: JSON.stringify({
+          mode: 'speech_analysis',
+          slideContext: rep.topicTitle || 'ซ้อมพูดปากเปล่า',
+          topicTitle: rep.topicTitle,
+          speakerScript: rep.speakerScript,
+          recentTranscript: transcriptText,
+          metricsSummary,
+          durationSeconds: rep.durationSeconds,
+        }),
+      });
+
+      const data = (await res.json()) as {
+        analysis?: SpeechContentAnalysis;
+        quota?: AiQuotaSnapshot;
+      };
+      emitQuotaUpdated(data.quota);
+
+      if (data.analysis) {
+        setReport((curr) => {
+          const base = curr ?? rep;
+          const updated: AnySessionReport = {
+            ...base,
+            speechAnalysis: data.analysis,
+          };
+          saveSessionReport(updated);
+          return updated;
+        });
+      }
+    } catch {
+      // Ignore silent failure so report remains usable
+    } finally {
+      setSpeechAnalysisLoading(false);
+    }
+  }, []);
 
   const generateJudgeQuestions = useCallback(
     async (rep: AnySessionReport, pl: PresentationPlan | null) => {
@@ -149,9 +205,9 @@ export default function ReportDetailPage() {
     if (!found) return;
 
     const plans = listPlans();
-    const matchedPlan =
-      (found.planId ? plans.find((p) => p.id === found.planId) : null) ??
-      getActivePlan();
+    const matchedPlan = found.planId
+      ? (plans.find((p) => p.id === found.planId) ?? null)
+      : null;
 
     setReport(found);
     setPlan(matchedPlan);
@@ -162,6 +218,11 @@ export default function ReportDetailPage() {
     });
     setDraftAnswers(existingAnswers);
 
+    if (!matchedPlan && !found.speechAnalysis && !autoSpeechRequestedRef.current) {
+      autoSpeechRequestedRef.current = true;
+      void generateSpeechAnalysis(found);
+    }
+
     if (
       (!found.audienceHistory || found.audienceHistory.length === 0) &&
       !autoRequestedRef.current
@@ -169,7 +230,7 @@ export default function ReportDetailPage() {
       autoRequestedRef.current = true;
       void generateJudgeQuestions(found, matchedPlan);
     }
-  }, [params.id, generateJudgeQuestions]);
+  }, [params.id, generateJudgeQuestions, generateSpeechAnalysis]);
 
   const speakQuestion = (q: AudienceMessage) => {
     if (speakingId === q.id) {
@@ -320,12 +381,107 @@ export default function ReportDetailPage() {
           <p className="text-xs text-slate-500">
             ระยะเวลา {report.durationSeconds} วินาที •{' '}
             {new Date(report.createdAt).toLocaleString('th-TH')}
-            {plan ? ` • สไลด์: ${plan.fileName}` : ''}
+            {plan
+              ? ` • สไลด์: ${plan.fileName}`
+              : report.topicTitle
+                ? ` • หัวข้อ: ${report.topicTitle}`
+                : ' • โหมดพูดอิสระ (ไม่ใช้สไลด์)'}
           </p>
         </div>
       </div>
 
       <ScoreOverview report={report} />
+
+      {/* Slide-Free Speech Structure Analysis Card */}
+      {(!plan || report.speechAnalysis) && (
+        <section className="rounded-2xl border border-[#E8DCE0] bg-white p-5 sm:p-6 space-y-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E8DCE0] pb-3.5">
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#BE2257]">
+                การวิเคราะห์เนื้อหาจากคำพูดจริง
+              </span>
+              <h2 className="text-base sm:text-lg font-bold text-[#1F161A]">
+                {report.speechAnalysis?.detectedTopic ||
+                  report.topicTitle ||
+                  'สรุปโครงสร้างคำพูด (โหมดไร้สไลด์)'}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {report.speechAnalysis && (
+                <span className="rounded-lg bg-[#FCE8EE] px-2.5 py-1 text-xs font-bold text-[#BE2257] tabular-nums">
+                  ความชัดเจนเนื้อหา {report.speechAnalysis.clarityScore}/100
+                </span>
+              )}
+              <button
+                type="button"
+                disabled={speechAnalysisLoading}
+                onClick={() => void generateSpeechAnalysis(report)}
+                className="app-press inline-flex items-center gap-1.5 rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] hover:bg-[#FCE8EE] px-3 py-1.5 text-xs font-semibold text-[#1F161A] disabled:opacity-50"
+              >
+                {speechAnalysisLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#EC3D6A]" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5 text-[#EC3D6A]" />
+                )}
+                วิเคราะห์คำพูดใหม่
+              </button>
+            </div>
+          </div>
+
+          {speechAnalysisLoading && !report.speechAnalysis ? (
+            <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin text-[#EC3D6A]" />
+              กำลังสรุปและประเมินโครงสร้างคำพูดของคุณ...
+            </div>
+          ) : report.speechAnalysis ? (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-700 leading-relaxed">
+                {report.speechAnalysis.structureSummaryTh}
+              </p>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-[#E8DCE0] bg-[#FAF6F7] p-4 space-y-2">
+                  <h3 className="text-xs font-bold text-[#1F161A]">
+                    ประเด็นหลักที่ผู้ฟังจับใจความได้
+                  </h3>
+                  <ul className="space-y-1.5 text-xs text-slate-700">
+                    {report.speechAnalysis.keyTakeaways.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="font-mono text-[11px] font-bold text-[#EC3D6A] mt-0.5">
+                          0{idx + 1}
+                        </span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-xl border border-[#E8DCE0] bg-[#FAF6F7] p-4 space-y-2">
+                  <h3 className="text-xs font-bold text-[#BE2257]">
+                    คำแนะนำเพื่อปรับปรุงบทพูด
+                  </h3>
+                  <ul className="space-y-1.5 text-xs text-slate-700">
+                    {report.speechAnalysis.improvementsTh.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#EC3D6A]" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#F2C4D0] bg-[#FCE8EE]/45 px-4 py-3 text-xs text-[#1F161A]">
+                <span className="font-semibold text-[#BE2257]">
+                  ตัวอย่างประโยคปิดท้ายที่คมขึ้น:{' '}
+                </span>
+                &ldquo;{report.speechAnalysis.suggestedClosingTh}&rdquo;
+              </div>
+            </div>
+          ) : null}
+        </section>
+      )}
 
       {report.mode === 'team' && (
         <TeamBreakdown report={report as TeamSessionReport} />

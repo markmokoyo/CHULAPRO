@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" fill="none">
+  <rect width="640" height="360" fill="#FFFFFF"/>
+  <rect width="640" height="10" fill="#EC3D6A"/>
+  <rect x="44" y="42" width="118" height="26" rx="6" fill="#FCE8EE"/>
+  <text x="58" y="59" fill="#BE2257" font-family="sans-serif" font-size="13" font-weight="700">SLIDE 01 • PROBLEM</text>
+  <text x="44" y="114" fill="#1F161A" font-family="sans-serif" font-size="28" font-weight="700">ความประหม่าบนเวที และการคุมเวลา</text>
+  <rect x="44" y="142" width="552" height="56" rx="12" fill="#FAF6F7" stroke="#E8DCE0"/>
+  <text x="64" y="175" fill="#475569" font-family="sans-serif" font-size="17">• พูดเร็วเกิน 220 พยางค์/นาที โดยไม่รู้ตัวเมื่อตื่นเต้น</text>
+  <rect x="44" y="212" width="552" height="56" rx="12" fill="#FAF6F7" stroke="#E8DCE0"/>
+  <text x="64" y="245" fill="#475569" font-family="sans-serif" font-size="17">• เผลอใช้คำติดปาก "อืม / อ่า / แบบว่า" และก้มมองสไลด์</text>
+  <text x="44" y="324" fill="#94A3B8" font-family="sans-serif" font-size="13">CuePulse Presentation Studio</text>
+</svg>

@@ -9,6 +9,8 @@ export interface SlideItem {
   allocatedSeconds: number;
   keyPoints: string[];
   speakingGuide?: string;
+  speakerScript?: string;
+  imageDataUrl?: string;
   likelyJudgeQuestion?: string;
   transitionPhrase: string;
   emphasisCues: string[];
@@ -18,6 +20,7 @@ export interface SlideItem {
 export interface PresentationPlan {
   id: string;
   fileName: string;
+  sourceType?: 'slides' | 'freeform';
   totalDurationSeconds: number;
   formality: FormalityLevel;
   executiveSummary?: string;
@@ -81,10 +84,22 @@ export interface SessionMetrics {
   goodPostureRatio: number;
 }
 
+export interface SpeechContentAnalysis {
+  detectedTopic: string;
+  clarityScore: number;
+  structureSummaryTh: string;
+  keyTakeaways: string[];
+  improvementsTh: string[];
+  suggestedClosingTh: string;
+  source: 'gemini' | 'offline-fallback';
+}
+
 export interface SessionReport {
   sessionId: string;
   mode: 'solo' | 'team';
   planId?: string;
+  topicTitle?: string;
+  speakerScript?: string;
   durationSeconds: number;
   overallScore: number;
   metrics: SessionMetrics;
@@ -92,6 +107,7 @@ export interface SessionReport {
   hapticCues: HapticCueEvent[];
   telemetryTimeline: TelemetrySnapshot[];
   transcriptSegments: TranscriptSegment[];
+  speechAnalysis?: SpeechContentAnalysis;
   audienceHistory?: AudienceMessage[];
   aiFeedbackSummary?: string;
   createdAt: string;

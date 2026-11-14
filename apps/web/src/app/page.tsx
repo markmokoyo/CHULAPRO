@@ -120,15 +120,19 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Right Quick Context Tag on Desktop */}
-          <div className="hidden md:flex shrink-0 flex-col items-end text-right space-y-1.5 border-l border-[#E8DCE0] pl-6">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-              เกณฑ์จังหวะแนะนำ
-            </span>
-            <span className="text-2xl font-bold text-[#1F161A] tabular-nums">
-              180–220
-            </span>
-            <span className="text-xs text-slate-500">พยางค์ต่อนาที</span>
+          {/* Right Editorial Studio Illustration on Desktop */}
+          <div className="hidden md:flex shrink-0 flex-col items-end space-y-2 border-l border-[#E8DCE0] pl-6">
+            <img
+              src="/images/studio-stage.svg"
+              alt="ภาพจำลองสตูดิโอซ้อมพูดและสไลด์"
+              className="w-64 h-auto rounded-xl"
+            />
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>เกณฑ์จังหวะแนะนำ</span>
+              <span className="font-bold text-[#1F161A] tabular-nums">
+                180–220 พยางค์/นาที
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -168,15 +172,30 @@ export default function DashboardPage() {
                   {activePlan.slides.slice(0, 3).map((s) => (
                     <div
                       key={s.slideNumber}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-[#E8DCE0] px-3.5 py-2.5 text-sm"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-[#E8DCE0] px-3.5 py-2 text-sm"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#FCE8EE] text-xs font-bold text-[#BE2257]">
-                          {s.slideNumber}
-                        </span>
-                        <span className="font-medium text-[#1F161A] truncate">
-                          {s.title}
-                        </span>
+                        {s.imageDataUrl ? (
+                          <img
+                            src={s.imageDataUrl}
+                            alt={`ตัวอย่างสไลด์หน้า ${s.slideNumber}`}
+                            className="h-9 w-16 shrink-0 rounded-md border border-[#E8DCE0] object-cover bg-white"
+                          />
+                        ) : (
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#FCE8EE] text-xs font-bold text-[#BE2257]">
+                            {s.slideNumber}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <span className="font-medium text-[#1F161A] truncate block">
+                            {s.slideNumber}. {s.title}
+                          </span>
+                          {s.speakerScript && (
+                            <span className="text-[11px] text-slate-500 truncate block">
+                              มีสคริปต์พูดพร้อมซ้อม
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-600 tabular-nums">
                         <Clock className="h-3.5 w-3.5 text-[#EC3D6A]" />

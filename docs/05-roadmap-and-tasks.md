@@ -36,6 +36,11 @@
 - [ ] **T1.6.1** `[QA]` ติดตั้ง Dependencies (`npm install`) และทดสอบ E2E Flow บนเบราว์เซอร์จริง
 - [ ] **T1.6.2** `[QA]` รัน `npm test`, `npm run lint`, `npm run typecheck`, `npm run build` ให้ผ่าน 100%
 
+### Milestone 1.7: Editorial UI Polish, Slide Visuals, Speaker Scripts & Slide-Free Analysis
+- [x] **T1.7.1** `[Architect & AI]` อัปเดต `docs/02-shared-architecture-and-contracts.md`, `packages/shared/src/types.ts`, `packages/shared/src/prompts.ts`, `packages/shared/src/scoring.ts` รองรับภาพสไลด์ (`imageDataUrl`), สคริปต์คำพูด (`speakerScript`), และผลวิเคราะห์คำพูดอิสระ (`SpeechContentAnalysis`)
+- [x] **T1.7.2** `[Web Frontend]` ปรับดีไซน์ Editorial Studio ไร้ Emoji พร้อมภาพประกอบ SVG (`apps/web/public/images/*`) และจัดหน้าต่างแบบแท็บไม่รกใน `/`, `/planner`, `/practice/solo`, `/practice/team`, `/report/[id]`
+- [x] **T1.7.3** `[AI & Prompt]` เพิ่มการเรนเดอร์ภาพสไลด์ 16:9 ใน `slideParser.ts` + ปุ่มซ่อน/แสดงรูปสไลด์ + แก้ไขสคริปต์พูดใน `SlideTeleprompter.tsx` & `/planner` และโหมดวิเคราะห์คำพูดอัตโนมัติเมื่อไม่ได้เพิ่มสไลด์ (`POST /api/audience` `speech_analysis`)
+
 ---
 
 ## Phase 2: Native Mobile App — Android & Wear OS (Upcoming)

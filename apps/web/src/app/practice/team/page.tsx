@@ -57,6 +57,9 @@ export default function TeamPracticePage() {
   const cooldownRef = useRef<CooldownManager>(new CooldownManager(20_000));
 
   const [plan, setPlan] = useState<PresentationPlan | null>(null);
+  const [useSlides, setUseSlides] = useState(true);
+  const [freeformTopic, setFreeformTopic] = useState('');
+  const [freeformScript, setFreeformScript] = useState('');
   const [slideIdx, setSlideIdx] = useState(0);
   const [slideElapsedSec, setSlideElapsedSec] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
@@ -297,9 +300,12 @@ export default function TeamPracticePage() {
 
   const finishTeamSession = () => {
     stopAll();
+    const activePlan = useSlides ? plan : null;
     const report = buildTeamSessionReport({
       sessionId: `team-${Date.now()}`,
-      planId: plan?.id,
+      planId: activePlan?.id,
+      topicTitle: !activePlan ? freeformTopic.trim() || undefined : undefined,
+      speakerScript: !activePlan ? freeformScript.trim() || undefined : undefined,
       durationSeconds: Math.max(1, elapsedSec),
       members,
       telemetryTimeline: timelineRef.current,
@@ -311,6 +317,7 @@ export default function TeamPracticePage() {
     router.push(`/report/${report.sessionId}`);
   };
 
+  const activePlan = useSlides ? plan : null;
   const activeMemberName =
     members.find((m) => m.memberId === activeSpeakerId)?.name ?? 'รอเสียงพูด...';
 
@@ -318,11 +325,11 @@ export default function TeamPracticePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Isolated Team Analysis Mode
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1F161A]">
+            ห้องซ้อมนำเสนอเป็นกลุ่ม
           </h1>
           <p className="text-sm text-slate-500">
-            ซ้อมพรีเซนต์กลุ่ม 2–5 คน แยกวิเคราะห์ผู้พูดจาก Lip-Sync และติดตามความลื่นไหลในการส่งไม้ต่อ
+            ซ้อมพรีเซนต์กลุ่ม 2–5 คน แยกวิเคราะห์ผู้พูดจากริมฝีปากและติดตามความต่อเนื่องในการส่งไม้ต่อ
           </p>
         </div>
 
@@ -345,9 +352,9 @@ export default function TeamPracticePage() {
       )}
 
       {step === 'enroll' ? (
-        <div className="rounded-2xl border border-[#F2C4D0] bg-white p-5 sm:p-6 space-y-5 shadow-sm">
+        <div className="rounded-2xl border border-[#E8DCE0] bg-white p-5 sm:p-6 space-y-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-bold text-[#1F161A] flex items-center gap-2">
               <Users className="h-4 w-4 text-[#EC3D6A]" />
               ลงทะเบียนสมาชิกทีม ({members.length}/5 คน)
             </h2>
@@ -355,7 +362,7 @@ export default function TeamPracticePage() {
               type="button"
               disabled={members.length >= 5}
               onClick={addMember}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#FF8FAB] bg-[#FFE0EA] hover:bg-[#FFD1DF] px-3 py-1.5 text-xs font-semibold text-[#BE2257] disabled:opacity-40"
+              className="app-press inline-flex items-center gap-1.5 rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] hover:bg-[#FCE8EE] px-3 py-1.5 text-xs font-semibold text-[#BE2257] disabled:opacity-40"
             >
               <Plus className="h-3.5 w-3.5" />
               เพิ่มสมาชิก
@@ -370,7 +377,7 @@ export default function TeamPracticePage() {
             {members.map((m, idx) => (
               <div
                 key={m.memberId}
-                className="rounded-xl border border-[#FF9EB8] bg-[#FFEFF4] p-4 space-y-2.5"
+                className="rounded-xl border border-[#E8DCE0] bg-[#FAF6F7] p-4 space-y-2.5"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[#BE2257]">
@@ -399,7 +406,7 @@ export default function TeamPracticePage() {
                     )
                   }
                   placeholder="ชื่อสมาชิก"
-                  className="w-full rounded-lg border border-[#FF9EB8] bg-white px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-[#EC3D6A]"
+                  className="w-full rounded-lg border border-[#D8C5CB] bg-white px-3 py-1.5 text-sm text-[#1F161A] focus:outline-none focus:border-[#EC3D6A]"
                 />
               </div>
             ))}
@@ -409,7 +416,7 @@ export default function TeamPracticePage() {
             type="button"
             disabled={loading}
             onClick={() => void startTeamSession()}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-5 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+            className="app-press w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-5 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -422,7 +429,7 @@ export default function TeamPracticePage() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-12">
           <div className="lg:col-span-7 space-y-4">
-            <div className="relative aspect-video overflow-hidden rounded-2xl border-2 border-[#FF9EB8] bg-slate-900 shadow-sm">
+            <div className="relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-slate-900 shadow-sm">
               <video
                 ref={videoRef}
                 muted
@@ -433,7 +440,7 @@ export default function TeamPracticePage() {
                 ref={canvasRef}
                 className="pointer-events-none absolute inset-0 h-full w-full -scale-x-100"
               />
-              <div className="absolute left-3 top-3 sm:left-4 sm:top-4 rounded-xl bg-white/95 border border-[#FF9EB8] px-3.5 py-2 text-xs shadow-sm">
+              <div className="absolute left-3 top-3 sm:left-4 sm:top-4 rounded-xl bg-white/95 border border-[#E8DCE0] px-3.5 py-2 text-xs shadow-sm">
                 <span className="text-slate-500">ผู้พูดปัจจุบัน: </span>
                 <span className="font-bold text-[#BE2257]">{activeMemberName}</span>
               </div>
@@ -447,16 +454,32 @@ export default function TeamPracticePage() {
               liveAlertsEnabled={liveAlertsEnabled}
               onToggleLiveAlerts={() => setLiveAlertsEnabled((v) => !v)}
             />
+            {plan && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setUseSlides((v) => !v)}
+                  className="rounded-lg border border-[#D8C5CB] bg-white hover:bg-[#FCE8EE] px-2.5 py-1 text-[11px] font-semibold text-[#1F161A] transition"
+                >
+                  {useSlides ? 'ซ้อมแบบไม่ใช้สไลด์' : 'กลับมาใช้แผนสไลด์'}
+                </button>
+              </div>
+            )}
             <SlideTeleprompter
-              plan={plan}
+              plan={activePlan}
               currentSlideIndex={slideIdx}
               slideElapsedSeconds={slideElapsedSec}
               onPrevSlide={() => setSlideIdx((i) => Math.max(0, i - 1))}
               onNextSlide={() =>
                 setSlideIdx((i) =>
-                  plan ? Math.min(plan.slides.length - 1, i + 1) : i
+                  activePlan ? Math.min(activePlan.slides.length - 1, i + 1) : i
                 )
               }
+              onSelectSlide={(idx) => setSlideIdx(idx)}
+              freeformTopic={freeformTopic}
+              onChangeFreeformTopic={setFreeformTopic}
+              freeformScript={freeformScript}
+              onChangeFreeformScript={setFreeformScript}
             />
           </div>
         </div>

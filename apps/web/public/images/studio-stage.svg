@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260" fill="none">
+  <rect width="420" height="260" rx="20" fill="#FAF6F7" stroke="#E8DCE0" stroke-width="1.5"/>
+  <!-- Soft studio backdrop circles -->
+  <circle cx="330" cy="64" r="56" fill="#FCE8EE"/>
+  <circle cx="96" cy="204" r="44" fill="#FCE8EE" opacity="0.7"/>
+  <!-- Slide board mockup -->
+  <rect x="34" y="34" width="212" height="128" rx="12" fill="#FFFFFF" stroke="#D8C5CB" stroke-width="1.5"/>
+  <rect x="34" y="34" width="212" height="22" rx="12" fill="#FCE8EE"/>
+  <circle cx="50" cy="45" r="3.5" fill="#EC3D6A"/>
+  <circle cx="62" cy="45" r="3.5" fill="#FB6F92" opacity="0.6"/>
+  <circle cx="74" cy="45" r="3.5" fill="#D8C5CB"/>
+  <!-- Slide content bars -->
+  <rect x="50" y="72" width="110" height="10" rx="5" fill="#1F161A"/>
+  <rect x="50" y="92" width="168" height="6" rx="3" fill="#E8DCE0"/>
+  <rect x="50" y="106" width="144" height="6" rx="3" fill="#E8DCE0"/>
+  <rect x="50" y="124" width="76" height="22" rx="6" fill="#FCE8EE"/>
+  <rect x="134" y="124" width="96" height="22" rx="6" fill="#FAF6F7" stroke="#E8DCE0"/>
+  <!-- Camera / Speaker frame -->
+  <rect x="218" y="94" width="168" height="132" rx="14" fill="#1F161A" stroke="#FFFFFF" stroke-width="3"/>
+  <circle cx="302" cy="146" r="21" fill="#FCE8EE"/>
+  <path d="M266 212C266 190 282 175 302 175C322 175 338 190 338 212" fill="#EC3D6A"/>
+  <!-- Live pace indicator pill -->
+  <rect x="230" y="106" width="68" height="18" rx="9" fill="#2F2328"/>
+  <circle cx="241" cy="115" r="3" fill="#EC3D6A"/>
+  <rect x="249" y="112.5" width="38" height="5" rx="2.5" fill="#FFFFFF" opacity="0.85"/>
+  <!-- Voice waveform bottom left -->
+  <rect x="34" y="182" width="166" height="44" rx="10" fill="#FFFFFF" stroke="#E8DCE0"/>
+  <path d="M52 204V204M62 198V210M72 192V216M82 200V208M92 189V219M102 196V212M112 191V217M122 199V209M132 194V214M142 201V207M152 195V213M162 200V208M172 198V210M182 202V206" stroke="#EC3D6A" stroke-width="3.2" stroke-linecap="round"/>
+</svg>

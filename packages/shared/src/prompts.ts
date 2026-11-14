@@ -7,6 +7,7 @@ export function buildSlidePlannerPrompt(params: {
   slides: {
     slideNumber: number;
     extractedText: string;
+    speakerScript?: string;
     wordCount?: number;
     estimatedSyllables?: number;
   }[];
@@ -24,7 +25,7 @@ export function buildSlidePlannerPrompt(params: {
 ${params.slides
   .map(
     (s) =>
-      `--- Slide ${s.slideNumber} (${s.wordCount ?? '-'} คำ / ประมาณ ${s.estimatedSyllables ?? '-'} พยางค์) ---\n${s.extractedText.slice(0, 1800)}`
+      `--- Slide ${s.slideNumber} (${s.wordCount ?? '-'} คำ / ประมาณ ${s.estimatedSyllables ?? '-'} พยางค์) ---\n${s.extractedText.slice(0, 1800)}${s.speakerScript ? `\n[สคริปต์ที่ผู้ใช้เตรียมไว้]: ${s.speakerScript.slice(0, 600)}` : ''}`
   )
   .join('\n\n')}
 
@@ -36,9 +37,10 @@ ${params.slides
 5. "slides": อาร์เรย์ครบทุก ${params.slides.length} สไลด์ โดยแต่ละรายการมี:
    - "slideNumber": number
    - "title": ชื่อหัวข้อสไลด์ที่สรุปตรงประเด็นและสั้นกระชับ
-   - "allocatedSeconds": number (จัดสรรตามความสำคัญและความหนาแน่นของเนื้อหา + บทบาทของสไลด์ เช่น หน้าปก/สรุปสั้นกว่า หน้ากลไก/ผลลัพธ์ยาวกว่า โดยผลรวมทุกสไลด์ต้องเท่ากับ ${params.totalDurationSeconds} วินาทีพอดี)
+   - "allocatedSeconds": number (จัดสรรตามความสำคัญและความหนาแน่นของเนื้อหา + บทบาทของสไลด์ โดยผลรวมทุกสไลด์ต้องเท่ากับ ${params.totalDurationSeconds} วินาทีพอดี)
    - "keyPoints": string[] (ประเด็นสำคัญที่ต้องสื่อสาร 2-4 ข้อ แบบสรุปเป็นภาษาพูด ไม่คัดลอกย่อหน้าดิบ)
    - "speakingGuide": string (คำแนะนำวิธีเล่าและลำดับการอธิบายในสไลด์หน้านี้ 1-2 ประโยค)
+   - "speakerScript": string (สคริปต์คำพูดภาษาไทยที่เป็นธรรมชาติ ใช้พูดจริงได้พอดีกับเวลาของหน้านั้น หากผู้ใช้เตรียมสคริปต์ไว้แล้วให้เกลาให้ลื่นไหลขึ้น)
    - "likelyJudgeQuestion": string (1 คำถามเจาะลึกที่กรรมการมักถามเมื่อเห็นข้อมูลในสไลด์หน้านี้)
    - "transitionPhrase": string (ประโยคเชื่อมภาษาไทยอย่างลื่นไหลไปสไลด์ถัดไป)
    - "emphasisCues": string[] (คำ/ตัวเลข/วลีที่ควรเน้นเสียง 2-4 รายการ)
@@ -146,5 +148,39 @@ ${params.slideContext.slice(0, 1500)}
   "evaluationScore": 82,
   "evaluationFeedbackTh": "คำประเมินจุดดีและจุดที่ยังขาดความชัดเจนของคำตอบนี้ (2-3 ประโยคภาษาไทย)",
   "improvedAnswerTh": "ตัวอย่างคำตอบฉบับปรับปรุงที่ตอบตรงประเด็น กระชับ ใช้เวลาพูด ~20-30 วินาที"
+}`;
+}
+
+export function buildSpeechOnlyAnalysisPrompt(params: {
+  topicTitle?: string;
+  speakerScript?: string;
+  transcriptText: string;
+  metricsSummary: string;
+  durationSeconds: number;
+}): string {
+  return `คุณคือโค้ชการสื่อสารและกรรมการประเมินการนำเสนอภาษาไทย
+ผู้พูดซ้อมพูดในโหมดอิสระ (ไม่ได้แนบไฟล์สไลด์) กรุณาวิเคราะห์จากคำพูดจริงที่ถอดเสียงได้ (และสคริปต์/หัวข้อหากมี) เพื่อสรุปโครงสร้าง ประเมินความชัดเจน และแนะนำแนวทางปรับปรุงบทพูด
+
+หัวข้อที่ผู้พูดระบุ: ${params.topicTitle || '(ไม่ได้ระบุ ให้สกัดจากคำพูดเอง)'}
+ระยะเวลาพูด: ${params.durationSeconds} วินาที
+สถิติการนำเสนอ: ${params.metricsSummary}
+${params.speakerScript ? `\nสคริปต์ที่ผู้พูดเตรียมไว้:\n"${params.speakerScript.slice(0, 1500)}"\n` : ''}
+คำพูดจริงที่ถอดเสียงได้:
+"${params.transcriptText.slice(0, 3000)}"
+
+ตอบกลับเป็น Valid JSON Object เดียวเท่านั้น:
+{
+  "detectedTopic": "หัวข้อหรือแก่นเรื่องหลักที่จับใจความได้จากคำพูด",
+  "clarityScore": 80,
+  "structureSummaryTh": "สรุปภาพรวมการลำดับเรื่อง (การเปิด-เนื้อหา-ปิด) และความเชื่อมโยงกับสคริปต์ (2-3 ประโยคภาษาไทย)",
+  "keyTakeaways": [
+    "ประเด็นหลักข้อที่ 1 ที่ผู้ฟังได้รับจากคำพูด",
+    "ประเด็นหลักข้อที่ 2"
+  ],
+  "improvementsTh": [
+    "คำแนะนำเจาะจงในการปรับบทพูดหรือการเรียบเรียงคำข้อที่ 1",
+    "คำแนะนำข้อที่ 2"
+  ],
+  "suggestedClosingTh": "ตัวอย่างประโยคปิดท้าย 1-2 ประโยคที่ช่วยให้คำพูดรอบนี้จบอย่างมีพลังและน่าจดจำ"
 }`;
 }

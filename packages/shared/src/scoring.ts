@@ -145,6 +145,8 @@ export function detectLexicalFillers(
 export function buildSessionReport(input: {
   sessionId: string;
   planId?: string;
+  topicTitle?: string;
+  speakerScript?: string;
   durationSeconds: number;
   telemetryTimeline: TelemetrySnapshot[];
   fillers: FillerOccurrence[];
@@ -195,6 +197,8 @@ export function buildSessionReport(input: {
     sessionId: input.sessionId,
     mode: 'solo',
     planId: input.planId,
+    topicTitle: input.topicTitle,
+    speakerScript: input.speakerScript,
     durationSeconds: input.durationSeconds,
     overallScore,
     metrics: {
@@ -215,6 +219,8 @@ export function buildSessionReport(input: {
 export function buildTeamSessionReport(input: {
   sessionId: string;
   planId?: string;
+  topicTitle?: string;
+  speakerScript?: string;
   durationSeconds: number;
   members: TeamMemberProfile[];
   telemetryTimeline: TelemetrySnapshot[];
@@ -225,6 +231,8 @@ export function buildTeamSessionReport(input: {
   const base = buildSessionReport({
     sessionId: input.sessionId,
     planId: input.planId,
+    topicTitle: input.topicTitle,
+    speakerScript: input.speakerScript,
     durationSeconds: input.durationSeconds,
     telemetryTimeline: input.telemetryTimeline,
     fillers: input.fillers,

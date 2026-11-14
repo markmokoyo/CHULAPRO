@@ -3,8 +3,10 @@ import {
   buildAnswerEvaluationPrompt,
   buildAudienceSparringPrompt,
   buildJudgePanelPrompt,
+  buildSpeechOnlyAnalysisPrompt,
   type AudienceMessage,
   type AudiencePersonaId,
+  type SpeechContentAnalysis,
 } from '@cuepulse/shared';
 import {
   generateGeminiJson,
@@ -16,13 +18,21 @@ import {
 
 interface AudienceRequestBody {
   personaId?: AudiencePersonaId;
-  mode: 'interruption' | 'qa_challenge' | 'judge_panel' | 'evaluate_answer';
+  mode:
+    | 'interruption'
+    | 'qa_challenge'
+    | 'judge_panel'
+    | 'evaluate_answer'
+    | 'speech_analysis';
   slideContext: string;
   recentTranscript?: string;
   metricsSummary?: string;
   formality?: string;
   questionTh?: string;
   userAnswer?: string;
+  topicTitle?: string;
+  speakerScript?: string;
+  durationSeconds?: number;
 }
 
 export async function POST(request: Request) {
@@ -32,6 +42,75 @@ export async function POST(request: Request) {
     const hasKey = Boolean(apiKey);
     const currentQuota = getAiQuotaSnapshot(hasKey);
     let aiErrorMessage: string | undefined;
+
+    if (body.mode === 'speech_analysis') {
+      const transcriptText = (body.recentTranscript || '').trim();
+      if (apiKey && !currentQuota.rateLimited && (transcriptText || body.speakerScript)) {
+        try {
+          const prompt = buildSpeechOnlyAnalysisPrompt({
+            topicTitle: body.topicTitle,
+            speakerScript: body.speakerScript,
+            transcriptText:
+              transcriptText || '(ไม่ได้บันทึกข้อความถอดเสียง — วิเคราะห์จากสคริปต์และหัวข้อเป็นหลัก)',
+            metricsSummary: body.metricsSummary || 'ยังไม่มีสถิติ',
+            durationSeconds: body.durationSeconds ?? 60,
+          });
+
+          const { data: parsed, totalTokens } = await generateGeminiJson<{
+            detectedTopic?: string;
+            clarityScore?: number;
+            structureSummaryTh?: string;
+            keyTakeaways?: string[];
+            improvementsTh?: string[];
+            suggestedClosingTh?: string;
+          }>(apiKey, prompt);
+
+          const updatedQuota = recordGeminiSuccess(totalTokens, true);
+          const analysis: SpeechContentAnalysis = {
+            detectedTopic:
+              parsed.detectedTopic || body.topicTitle || 'การนำเสนอปากเปล่า (ไม่ใช้สไลด์)',
+            clarityScore: Math.max(
+              0,
+              Math.min(100, Math.round(parsed.clarityScore ?? 78))
+            ),
+            structureSummaryTh:
+              parsed.structureSummaryTh ||
+              'ลำดับการสื่อสารโดยรวมเข้าใจง่าย แนะนำให้สรุปประเด็นสำคัญไว้ในช่วงต้นและช่วงท้ายเพิ่มเติม',
+            keyTakeaways:
+              parsed.keyTakeaways && parsed.keyTakeaways.length > 0
+                ? parsed.keyTakeaways
+                : ['สื่อสารแนวคิดหลักได้ตรงประเด็น'],
+            improvementsTh:
+              parsed.improvementsTh && parsed.improvementsTh.length > 0
+                ? parsed.improvementsTh
+                : ['เสริมตัวอย่างประกอบหรือตัวเลขจริงเพื่อเพิ่มน้ำหนักให้คำพูด'],
+            suggestedClosingTh:
+              parsed.suggestedClosingTh ||
+              'ดังนั้น หากเรานำแนวทางนี้ไปปรับใช้จริง จะช่วยแก้ปัญหาได้อย่างชัดเจนและวัดผลได้ครับ/ค่ะ',
+            source: 'gemini',
+          };
+
+          return NextResponse.json({
+            analysis,
+            source: 'gemini',
+            quota: updatedQuota,
+          });
+        } catch (aiError) {
+          console.warn('Gemini speech_analysis fallback triggered:', aiError);
+          const updatedQuota = recordGeminiError(aiError, true);
+          aiErrorMessage =
+            updatedQuota.lastError ||
+            (aiError instanceof Error ? aiError.message : 'เรียกใช้ Gemini API ไม่สำเร็จ');
+        }
+      }
+
+      return NextResponse.json({
+        analysis: buildFallbackSpeechAnalysis(body),
+        source: 'offline-fallback',
+        aiError: aiErrorMessage,
+        quota: getAiQuotaSnapshot(hasKey),
+      });
+    }
 
     if (body.mode === 'judge_panel') {
       if (apiKey && !currentQuota.rateLimited) {
@@ -303,5 +382,74 @@ function buildFallbackAnswerEvaluation(answer: string): {
           : 'ตอบได้ตรงแนวทางแล้วครับ แนะนำให้เสริมตัวเลขสถิติ หรือกรณีศึกษาที่วัดผลได้จริงเพื่อเพิ่มน้ำหนักให้คำตอบ',
     improvedAnswerTh:
       'ประเด็นหลักคือเราแก้ปัญหาด้วยการ [ระบุกลไกหลัก] ซึ่งช่วยลดขั้นตอนเดิมลงได้ [ระบุตัวเลข/ผลลัพธ์] โดยทีมได้ทดสอบเบื้องต้นและมีแผนขยายผลในระยะถัดไปครับ',
+  };
+}
+
+function buildFallbackSpeechAnalysis(
+  body: AudienceRequestBody
+): SpeechContentAnalysis {
+  const transcript = (body.recentTranscript || '').trim();
+  const script = (body.speakerScript || '').trim();
+  const textToInspect = transcript || script;
+  const charCount = textToInspect.length;
+  const hasNumbers = /\d|%/.test(textToInspect);
+  const sentences = textToInspect
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 8);
+
+  const clarityScore = transcript
+    ? Math.min(90, 62 + Math.min(18, Math.round(charCount / 25)) + (hasNumbers ? 8 : 0))
+    : script
+      ? 72
+      : 55;
+
+  const takeaways =
+    sentences.slice(0, 3).length > 0
+      ? sentences.slice(0, 3).map((s) => s.slice(0, 110))
+      : [
+          body.topicTitle
+            ? `นำเสนอหัวข้อ "${body.topicTitle}" ในรูปแบบพูดสด`
+            : 'ซ้อมพูดปากเปล่าแบบอิสระโดยไม่ใช้สไลด์',
+        ];
+
+  const improvements: string[] = [];
+  if (!transcript) {
+    improvements.push(
+      'รอบนี้ยังไม่มีข้อความถอดเสียงคำพูด แนะนำให้ใช้เบราว์เซอร์ Chrome และอนุญาตไมโครโฟนเพื่อให้ระบบถอดเสียงประเมินเนื้อหาได้ครบถ้วน'
+    );
+  } else if (charCount < 120) {
+    improvements.push(
+      'เนื้อหาคำพูดที่บันทึกได้ยังค่อนข้างสั้น ลองขยายเหตุผลและยกตัวอย่างประกอบเพิ่มอีก 1–2 ประโยค'
+    );
+  }
+  if (!hasNumbers) {
+    improvements.push(
+      'ลองใส่ตัวเลขสถิติ ระยะเวลา หรือผลลัพธ์ที่วัดได้จริงในคำพูดเพื่อเพิ่มความน่าเชื่อถือ'
+    );
+  }
+  if (script && transcript) {
+    improvements.push(
+      'เปรียบเทียบคำพูดจริงกับสคริปต์ที่เตรียมไว้ เพื่อลดช่วงหยุดคิดและทำให้คำเชื่อมระหว่างประโยคลื่นไหลขึ้น'
+    );
+  }
+  if (improvements.length === 0) {
+    improvements.push(
+      'เปิดเรื่องด้วยประโยคคำถามหรือประเด็นปัญหาหลักภายใน 10 วินาทีแรก และสรุปทิ้งท้ายด้วยข้อความที่จำง่าย'
+    );
+  }
+
+  return {
+    detectedTopic:
+      body.topicTitle || sentences[0]?.slice(0, 55) || 'การซ้อมพูดปากเปล่า (โหมดไร้สไลด์)',
+    clarityScore,
+    structureSummaryTh: transcript
+      ? `ถอดเสียงได้ประมาณ ${charCount} ตัวอักษร ระบบประเมินความชัดเจนของเนื้อหาเบื้องต้นไว้ที่ ${clarityScore}/100 (ใส่ Gemini API Key เพื่อวิเคราะห์โครงสร้างคำพูดเชิงลึก)`
+      : 'ยังไม่มีข้อความถอดเสียงในรอบนี้ จึงประเมินจากสถิติการพูด สคริปต์ และหัวข้อที่กรอกไว้เบื้องต้น',
+    keyTakeaways: takeaways,
+    improvementsTh: improvements,
+    suggestedClosingTh:
+      'โดยสรุป แนวทางนี้ช่วยแก้ปัญหาที่ต้นเหตุได้อย่างชัดเจน และพร้อมนำไปต่อยอดใช้งานจริงได้ทันทีครับ/ค่ะ',
+    source: 'offline-fallback',
   };
 }

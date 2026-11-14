@@ -16,6 +16,7 @@ import {
 interface PlanRequestSlide {
   slideNumber: number;
   extractedText: string;
+  speakerScript?: string;
   wordCount?: number;
   estimatedSyllables?: number;
 }
@@ -160,6 +161,7 @@ function normalizeSlides(
             ? lines.slice(0, 3)
             : [`ประเด็นหลักหน้า ${src.slideNumber}`],
       speakingGuide: ai?.speakingGuide,
+      speakerScript: ai?.speakerScript || src.speakerScript,
       likelyJudgeQuestion: ai?.likelyJudgeQuestion,
       transitionPhrase:
         ai?.transitionPhrase ||
@@ -259,6 +261,11 @@ function buildOfflineFallbackPlan(
           : isLast
             ? 'สรุปผลลัพธ์หลัก 1-2 ประโยคและทิ้งท้ายให้ผู้ฟังจดจำ'
             : `อธิบายหัวข้อ "${title}" ภายใน ~${allocated} วินาที โดยเน้นประเด็นสำคัญไม่เกิน 3 จุด`,
+      speakerScript:
+        src.speakerScript ||
+        (fallbackSentences.length > 0
+          ? `ในส่วนของ ${title} ประเด็นสำคัญคือ ${fallbackSentences.slice(0, 2).join(' และ ')} ครับ/ค่ะ`
+          : `สไลด์หน้านี้จะขออธิบายเรื่อง ${title} เพื่อให้เห็นภาพรวมชัดเจนยิ่งขึ้นครับ/ค่ะ`),
       likelyJudgeQuestion: `จากข้อมูลในหน้า "${title}" มีหลักฐานหรือวิธีวัดผลอย่างไรให้มั่นใจว่าทำได้จริง?`,
       transitionPhrase: isLast
         ? 'ขอขอบคุณทุกท่านครับ/ค่ะ หากมีคำถามเพิ่มเติมยินดีแลกเปลี่ยนครับ'

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" fill="none">
+  <rect width="640" height="360" fill="#FFFFFF"/>
+  <rect width="640" height="10" fill="#EC3D6A"/>
+  <rect x="44" y="42" width="128" height="26" rx="6" fill="#FCE8EE"/>
+  <text x="58" y="59" fill="#BE2257" font-family="sans-serif" font-size="13" font-weight="700">SLIDE 02 • SOLUTION</text>
+  <text x="44" y="114" fill="#1F161A" font-family="sans-serif" font-size="28" font-weight="700">CuePulse Web Studio &amp; Haptic Cue</text>
+  <rect x="44" y="148" width="170" height="122" rx="14" fill="#FCE8EE" stroke="#F2C4D0"/>
+  <text x="64" y="184" fill="#BE2257" font-family="sans-serif" font-size="16" font-weight="700">01 Eye &amp; Posture</text>
+  <text x="64" y="212" fill="#475569" font-family="sans-serif" font-size="14">ตรวจมุมสายตา</text>
+  <text x="64" y="234" fill="#475569" font-family="sans-serif" font-size="14">และบุคลิกภาพ</text>
+  <rect x="235" y="148" width="170" height="122" rx="14" fill="#FAF6F7" stroke="#E8DCE0"/>
+  <text x="255" y="184" fill="#1F161A" font-family="sans-serif" font-size="16" font-weight="700">02 Thai Pace</text>
+  <text x="255" y="212" fill="#475569" font-family="sans-serif" font-size="14">วัดพยางค์/นาที</text>
+  <text x="255" y="234" fill="#475569" font-family="sans-serif" font-size="14">และคำฟุ่มเฟือย</text>
+  <rect x="426" y="148" width="170" height="122" rx="14" fill="#FAF6F7" stroke="#E8DCE0"/>
+  <text x="446" y="184" fill="#1F161A" font-family="sans-serif" font-size="16" font-weight="700">03 20s Window</text>
+  <text x="446" y="212" fill="#475569" font-family="sans-serif" font-size="14">พักเตือนขั้นต่ำ</text>
+  <text x="446" y="234" fill="#475569" font-family="sans-serif" font-size="14">20 วินาทีไม่รบกวน</text>
+  <text x="44" y="324" fill="#94A3B8" font-family="sans-serif" font-size="13">CuePulse Presentation Studio</text>
+</svg>

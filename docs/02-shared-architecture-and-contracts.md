@@ -42,6 +42,8 @@ export interface SlideItem {
   allocatedSeconds: number;        // Pacing Budget ต่อสไลด์
   keyPoints: string[];             // ประเด็นสำคัญ 2-4 ข้อ
   speakingGuide?: string;          // แนวทางลำดับการเล่าเรื่องหน้านี้
+  speakerScript?: string;          // สคริปต์คำพูดที่ผู้ใช้กรอกหรือ AI ร่างให้
+  imageDataUrl?: string;           // ภาพตัวอย่างสไลด์ 16:9 สำหรับแสดงผลระหว่างซ้อม
   likelyJudgeQuestion?: string;    // คำถามที่กรรมการมักถามจากหน้านี้
   transitionPhrase: string;        // ประโยคเชื่อมไปสไลด์ถัดไป
   emphasisCues: string[];          // คำ/วลีที่ควรเน้นเสียง
@@ -51,6 +53,7 @@ export interface SlideItem {
 export interface PresentationPlan {
   id: string;
   fileName: string;
+  sourceType?: 'slides' | 'freeform';
   totalDurationSeconds: number;
   formality: FormalityLevel;
   executiveSummary?: string;
@@ -107,10 +110,22 @@ export interface FillerOccurrence {
   slideNumber: number;
 }
 
+export interface SpeechContentAnalysis {
+  detectedTopic: string;
+  clarityScore: number;
+  structureSummaryTh: string;
+  keyTakeaways: string[];
+  improvementsTh: string[];
+  suggestedClosingTh: string;
+  source: 'gemini' | 'offline-fallback';
+}
+
 export interface SessionReport {
   sessionId: string;
   mode: 'solo' | 'team';
   planId?: string;
+  topicTitle?: string;
+  speakerScript?: string;
   durationSeconds: number;
   overallScore: number;            // 0 - 100
   metrics: {
@@ -128,6 +143,7 @@ export interface SessionReport {
     startMs: number;
     endMs: number;
   }[];
+  speechAnalysis?: SpeechContentAnalysis;
   aiFeedbackSummary?: string;
   createdAt: string;
 }
