@@ -106,6 +106,79 @@ export async function getSessionVideo(sessionId: string): Promise<Blob | null> {
   }
 }
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const commaIdx = result.indexOf(',');
+      resolve(commaIdx !== -1 ? result.slice(commaIdx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read blob'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function extractVideoPayloadForAi(blob: Blob): Promise<{
+  videoBase64?: { mimeType: string; data: string };
+  frames?: Array<{ mimeType: string; data: string }>;
+}> {
+  // Send raw video directly if small enough to stay safely under Vercel 4.5MB limit
+  if (blob.size > 0 && blob.size <= 2_400_000) {
+    const base64 = await blobToBase64(blob);
+    const mimeType = (blob.type || 'video/webm').split(';')[0] || 'video/webm';
+    return { videoBase64: { mimeType, data: base64 } };
+  }
+
+  // Otherwise extract 5 evenly-spaced JPEG keyframes from the recorded video
+  if (typeof document === 'undefined') return {};
+  const url = URL.createObjectURL(blob);
+  try {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.src = url;
+
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('Video load failed'));
+    });
+
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 10;
+    const sampleCount = 5;
+    const canvas = document.createElement('canvas');
+    canvas.width = 480;
+    canvas.height = 270;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return {};
+
+    const frames: Array<{ mimeType: string; data: string }> = [];
+    for (let i = 0; i < sampleCount; i++) {
+      const targetTime = Math.min(
+        Math.max(0.2, duration - 0.2),
+        (duration * (i + 0.5)) / sampleCount
+      );
+      await new Promise<void>((resolve) => {
+        video.onseeked = () => resolve();
+        video.currentTime = targetTime;
+      });
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      const base64 = dataUrl.split(',')[1];
+      if (base64) {
+        frames.push({ mimeType: 'image/jpeg', data: base64 });
+      }
+    }
+
+    return { frames };
+  } catch {
+    return {};
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export interface SessionVideoRecorder {
   stop: () => Promise<Blob | null>;
 }

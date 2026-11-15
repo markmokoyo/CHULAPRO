@@ -59,6 +59,17 @@ export function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
+export type StarRating = 1 | 2 | 3 | 4 | 5;
+
+export function scoreToStars(score: number): StarRating {
+  const s = clampPercent(score);
+  if (s >= 90) return 5;
+  if (s >= 75) return 4;
+  if (s >= 60) return 3;
+  if (s >= 40) return 2;
+  return 1;
+}
+
 export class CooldownManager {
   private lastTriggeredAtMs: number | null = null;
   private readonly cooldownMs: number;

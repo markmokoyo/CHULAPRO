@@ -16,9 +16,13 @@ import {
   Video,
 } from 'lucide-react';
 import {
+  calculateFluencyScore,
+  calculatePacingScore,
+  scoreToStars,
   type AudienceMessage,
   type PresentationPlan,
   type SpeechContentAnalysis,
+  type StarEvaluationFeedback,
   type TeamSessionReport,
 } from '@cuepulse/shared';
 import {
@@ -28,6 +32,7 @@ import {
   saveSessionReport,
   type AnySessionReport,
 } from '@/services/storage';
+import { extractVideoPayloadForAi, getSessionVideo } from '@/services/videoStorage';
 import { emitQuotaUpdated } from '@/components/AiQuotaBadge';
 import type { AiQuotaSnapshot } from '@/services/geminiQuota';
 import { ScoreOverview } from '@/components/report/ScoreOverview';
@@ -48,6 +53,7 @@ export default function ReportDetailPage() {
 
   const [judgeLoading, setJudgeLoading] = useState(false);
   const [speechAnalysisLoading, setSpeechAnalysisLoading] = useState(false);
+  const [starEvalLoading, setStarEvalLoading] = useState(false);
   const [judgeSource, setJudgeSource] = useState<string | null>(null);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
@@ -60,6 +66,7 @@ export default function ReportDetailPage() {
 
   const autoRequestedRef = useRef(false);
   const autoSpeechRequestedRef = useRef(false);
+  const autoStarEvalRequestedRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -133,6 +140,77 @@ export default function ReportDetailPage() {
       // Ignore silent failure so report remains usable
     } finally {
       setSpeechAnalysisLoading(false);
+    }
+  }, []);
+
+  const generateStarEvaluation = useCallback(async (rep: AnySessionReport) => {
+    setStarEvalLoading(true);
+    try {
+      const videoBlob = await getSessionVideo(rep.sessionId);
+      const videoPayload = videoBlob ? await extractVideoPayloadForAi(videoBlob) : {};
+
+      const transcriptText = rep.transcriptSegments.map((t) => t.text).join(' ');
+      const fillerWords = Array.from(new Set(rep.fillers.map((f) => f.word))).slice(0, 6);
+      const postureIssues: string[] = [];
+      if (rep.telemetryTimeline.some((t) => t.isSlouching)) postureIssues.push('ไหล่ห่อ/หลังค่อม');
+      if (rep.telemetryTimeline.some((t) => t.isArmsCrossed)) postureIssues.push('กอดอก');
+      if (rep.telemetryTimeline.some((t) => t.isSwaying)) postureIssues.push('โยกตัวไปมา');
+
+      const stars = {
+        overall: scoreToStars(rep.overallScore),
+        fluency: scoreToStars(calculateFluencyScore(rep.metrics.fillerPerMinute)),
+        pacing: scoreToStars(calculatePacingScore(rep.metrics.averageSpm)),
+        eye: scoreToStars(rep.metrics.eyeContactRatio),
+        posture: scoreToStars(rep.metrics.goodPostureRatio),
+      };
+
+      const res = await fetch('/api/audience', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAiRequestHeaders(),
+        },
+        body: JSON.stringify({
+          mode: 'video_star_evaluation',
+          slideContext: rep.topicTitle || 'การซ้อมนำเสนอ',
+          recentTranscript: transcriptText,
+          durationSeconds: rep.durationSeconds,
+          metrics: {
+            overallScore: rep.overallScore,
+            averageSpm: rep.metrics.averageSpm,
+            fillerCount: rep.metrics.fillerCount,
+            fillerPerMinute: rep.metrics.fillerPerMinute,
+            eyeContactRatio: rep.metrics.eyeContactRatio,
+            goodPostureRatio: rep.metrics.goodPostureRatio,
+          },
+          stars,
+          fillerWordsSummary: fillerWords.join(', '),
+          postureIssuesSummary: postureIssues.join(', '),
+          ...videoPayload,
+        }),
+      });
+
+      const data = (await res.json()) as {
+        evaluation?: StarEvaluationFeedback;
+        quota?: AiQuotaSnapshot;
+      };
+      emitQuotaUpdated(data.quota);
+
+      if (data.evaluation) {
+        setReport((curr) => {
+          const base = curr ?? rep;
+          const updated: AnySessionReport = {
+            ...base,
+            starEvaluation: data.evaluation,
+          };
+          saveSessionReport(updated);
+          return updated;
+        });
+      }
+    } catch {
+      // Keep data-driven fallback if network fails
+    } finally {
+      setStarEvalLoading(false);
     }
   }, []);
 
@@ -216,6 +294,11 @@ export default function ReportDetailPage() {
       void generateSpeechAnalysis(found);
     }
 
+    if (!found.starEvaluation && !autoStarEvalRequestedRef.current) {
+      autoStarEvalRequestedRef.current = true;
+      void generateStarEvaluation(found);
+    }
+
     if (
       (!found.audienceHistory || found.audienceHistory.length === 0) &&
       !autoRequestedRef.current
@@ -223,7 +306,7 @@ export default function ReportDetailPage() {
       autoRequestedRef.current = true;
       void generateJudgeQuestions(found, matchedPlan);
     }
-  }, [params.id, generateJudgeQuestions, generateSpeechAnalysis]);
+  }, [params.id, generateJudgeQuestions, generateSpeechAnalysis, generateStarEvaluation]);
 
   const speakQuestion = (q: AudienceMessage) => {
     if (speakingId === q.id) {
@@ -451,7 +534,11 @@ export default function ReportDetailPage() {
       {/* Tab 1: Overview & Speech Content Analysis */}
       {activeTab === 'overview' && (
         <div className="space-y-5">
-          <ScoreOverview report={report} />
+          <ScoreOverview
+            report={report}
+            starEvalLoading={starEvalLoading}
+            onRegenerateStarEval={() => void generateStarEvaluation(report)}
+          />
 
           {/* Separated Q&A Quick Status Banner */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#DDD6FE] bg-gradient-to-r from-[#F5F3FF] via-white to-[#FFF0F5] px-5 py-4 shadow-sm">

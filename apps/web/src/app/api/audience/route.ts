@@ -7,13 +7,16 @@ import {
   type AudienceMessage,
   type AudiencePersonaId,
   type SpeechContentAnalysis,
+  type StarEvaluationFeedback,
 } from '@cuepulse/shared';
 import {
   generateGeminiJson,
+  generateGeminiMultimodalJson,
   getAiQuotaSnapshot,
   recordGeminiError,
   recordGeminiSuccess,
   resolveGeminiApiKey,
+  type GeminiInlinePart,
 } from '@/services/geminiQuota';
 
 interface AudienceRequestBody {
@@ -23,7 +26,8 @@ interface AudienceRequestBody {
     | 'qa_challenge'
     | 'judge_panel'
     | 'evaluate_answer'
-    | 'speech_analysis';
+    | 'speech_analysis'
+    | 'video_star_evaluation';
   slideContext: string;
   recentTranscript?: string;
   metricsSummary?: string;
@@ -33,6 +37,25 @@ interface AudienceRequestBody {
   topicTitle?: string;
   speakerScript?: string;
   durationSeconds?: number;
+  metrics?: {
+    overallScore: number;
+    averageSpm: number;
+    fillerCount: number;
+    fillerPerMinute: number;
+    eyeContactRatio: number;
+    goodPostureRatio: number;
+  };
+  stars?: {
+    overall: number;
+    fluency: number;
+    pacing: number;
+    eye: number;
+    posture: number;
+  };
+  fillerWordsSummary?: string;
+  postureIssuesSummary?: string;
+  videoBase64?: { mimeType: string; data: string };
+  frames?: Array<{ mimeType: string; data: string }>;
 }
 
 export async function POST(request: Request) {
@@ -42,6 +65,99 @@ export async function POST(request: Request) {
     const hasKey = Boolean(apiKey);
     const currentQuota = getAiQuotaSnapshot(hasKey);
     let aiErrorMessage: string | undefined;
+
+    if (body.mode === 'video_star_evaluation') {
+      const hasMedia = Boolean(body.videoBase64 || (body.frames && body.frames.length > 0));
+      if (apiKey && !currentQuota.rateLimited) {
+        try {
+          const stars = body.stars ?? {
+            overall: 3,
+            fluency: 3,
+            pacing: 3,
+            eye: 3,
+            posture: 3,
+          };
+          const m = body.metrics ?? {
+            overallScore: 70,
+            averageSpm: 0,
+            fillerCount: 0,
+            fillerPerMinute: 0,
+            eyeContactRatio: 0,
+            goodPostureRatio: 0,
+          };
+
+          const promptText = `คุณคือโค้ชฝึกพูดภาษาไทยมืออาชีพที่กำลังดูวิดีโอการซ้อมนำเสนอจริงของผู้พูด
+จงวิเคราะห์จากวิดีโอ/ภาพจากวิดีโอจริง (หากแนบมา) ร่วมกับข้อความถอดเสียงและสถิติจริงของรอบนี้ แล้วเขียนคำชมและข้อเสนอแนะเชิงบวกเป็นภาษาไทยความยาว 1-2 ประโยคต่อหัวข้อ โดยอ้างอิงสิ่งที่เกิดขึ้นจริงในวิดีโอหรือสถิติรอบนี้ (ห้ามเขียนคำกว้างๆ แบบทั่วไป ให้ระบุรายละเอียดจริง เช่น ท่าทางในภาพ คำพูดจริงที่พูด ความเร็ว SPM หรือคำฟุ่มเฟือยที่พบ) และคุมโทนเสียงให้ตรงกับระดับดาวของแต่ละหัวข้อ:
+- 1 ดาว: ชื่นชมความตั้งใจและจุดเริ่มต้นที่ดี พร้อมชี้แนะจุดที่ต้องปรับปรุงอย่างสุภาพและให้กำลังใจ
+- 2 ดาว: ชื่นชมการวางพื้นฐานและโครงสร้างหลัก แนะนำให้เติมรายละเอียดหรือฝึกเพิ่ม
+- 3 ดาว: ชื่นชมที่ได้มาตรฐาน ครบถ้วน เข้าใจง่าย แนะนำจุดเล็กๆ ที่จะทำให้น่าสนใจยิ่งขึ้น
+- 4 ดาว: ชื่นชมความยอดเยี่ยม คุณภาพระดับมืออาชีพ เหลือเพียงขัดเกลาอีกนิดเดียว
+- 5 ดาว: ชื่นชมความสมบูรณ์แบบ ระดับมาสเตอร์พีซ ครบถ้วนและทรงพลัง
+
+ข้อมูลจริงของการซ้อมรอบนี้:
+- ระยะเวลา: ${body.durationSeconds ?? 0} วินาที
+- คะแนนรวม: ${m.overallScore}/100 (${stars.overall}/5 ดาว)
+- ความลื่นไหลและคำฟุ่มเฟือย (${stars.fluency}/5 ดาว): พบ ${m.fillerCount} ครั้ง (${m.fillerPerMinute} ครั้ง/นาที) ${body.fillerWordsSummary ? `| คำที่พบ: ${body.fillerWordsSummary}` : ''}
+- ความเร็วในการพูด (${stars.pacing}/5 ดาว): เฉลี่ย ${m.averageSpm} พยางค์/นาที (เกณฑ์เหมาะสม 180-220)
+- การสบตาผู้ฟัง (${stars.eye}/5 ดาว): ${m.eyeContactRatio}%
+- บุคลิกภาพและท่าทาง (${stars.posture}/5 ดาว): ${m.goodPostureRatio}% ${body.postureIssuesSummary ? `| อาการที่ตรวจพบ: ${body.postureIssuesSummary}` : ''}
+- ข้อความที่พูดจริง: ${body.recentTranscript?.trim() ? body.recentTranscript.slice(0, 1200) : '(ไม่มีข้อความถอดเสียง)'}
+
+ตอบกลับเป็น JSON เท่านั้น ตามโครงสร้างนี้:
+{
+  "overall": "คำชมและข้อเสนอแนะสำหรับคะแนนรวม (1-2 ประโยค)",
+  "fluency": "คำชมและข้อเสนอแนะด้านความลื่นไหลและคำฟุ่มเฟือย (1-2 ประโยค)",
+  "pacing": "คำชมและข้อเสนอแนะด้านความเร็วในการพูด (1-2 ประโยค)",
+  "eye": "คำชมและข้อเสนอแนะด้านการสบตาจากภาพ/วิดีโอจริง (1-2 ประโยค)",
+  "posture": "คำชมและข้อเสนอแนะด้านบุคลิกท่าทางจากภาพ/วิดีโอจริง (1-2 ประโยค)"
+}`;
+
+          const parts: GeminiInlinePart[] = [];
+          if (body.videoBase64) {
+            parts.push({ inlineData: body.videoBase64 });
+          } else if (body.frames && body.frames.length > 0) {
+            for (const frame of body.frames.slice(0, 5)) {
+              parts.push({ inlineData: frame });
+            }
+          }
+          parts.push({ text: promptText });
+
+          const { data: parsed, totalTokens } = hasMedia
+            ? await generateGeminiMultimodalJson<Partial<StarEvaluationFeedback>>(apiKey, parts)
+            : await generateGeminiJson<Partial<StarEvaluationFeedback>>(apiKey, promptText);
+
+          const updatedQuota = recordGeminiSuccess(totalTokens, true);
+          const fallback = buildTelemetryStarFallback(body);
+          const evaluation: StarEvaluationFeedback = {
+            overall: parsed.overall?.trim() || fallback.overall,
+            fluency: parsed.fluency?.trim() || fallback.fluency,
+            pacing: parsed.pacing?.trim() || fallback.pacing,
+            eye: parsed.eye?.trim() || fallback.eye,
+            posture: parsed.posture?.trim() || fallback.posture,
+            source: hasMedia ? 'gemini-video' : 'gemini-telemetry',
+          };
+
+          return NextResponse.json({
+            evaluation,
+            source: evaluation.source,
+            quota: updatedQuota,
+          });
+        } catch (aiError) {
+          console.warn('Gemini video_star_evaluation fallback triggered:', aiError);
+          const updatedQuota = recordGeminiError(aiError, true);
+          aiErrorMessage =
+            updatedQuota.lastError ||
+            (aiError instanceof Error ? aiError.message : 'วิเคราะห์วิดีโอไม่สำเร็จ');
+        }
+      }
+
+      return NextResponse.json({
+        evaluation: buildTelemetryStarFallback(body),
+        source: 'telemetry-fallback',
+        aiError: aiErrorMessage,
+        quota: getAiQuotaSnapshot(hasKey),
+      });
+    }
 
     if (body.mode === 'speech_analysis') {
       const transcriptText = (body.recentTranscript || '').trim();
@@ -451,5 +567,61 @@ function buildFallbackSpeechAnalysis(
     suggestedClosingTh:
       'โดยสรุป แนวทางนี้ช่วยแก้ปัญหาที่ต้นเหตุได้อย่างชัดเจน และพร้อมนำไปต่อยอดใช้งานจริงได้ทันทีครับ/ค่ะ',
     source: 'offline-fallback',
+  };
+}
+
+function buildTelemetryStarFallback(body: AudienceRequestBody): StarEvaluationFeedback {
+  const m = body.metrics ?? {
+    overallScore: 70,
+    averageSpm: 0,
+    fillerCount: 0,
+    fillerPerMinute: 0,
+    eyeContactRatio: 0,
+    goodPostureRatio: 0,
+  };
+
+  const overall = `ทำคะแนนรวมได้ ${m.overallScore}/100 จากการซ้อมความยาว ${body.durationSeconds ?? 0} วินาที — ${
+    m.overallScore >= 85
+      ? 'ภาพรวมยอดเยี่ยมมาก รักษาความสม่ำเสมอของจังหวะและการสื่อสารได้ดีเยี่ยม'
+      : m.overallScore >= 65
+        ? 'วางพื้นฐานการนำเสนอได้ดีแล้ว ลองฝึกเพิ่มความมั่นใจในจุดที่คะแนนยังต่ำกว่า 75% จะช่วยให้โดดเด่นขึ้นมาก'
+        : 'เป็นจุดเริ่มต้นที่ดีในการฝึกซ้อม แนะนำให้โฟกัสแก้ทีละจุด เช่น ลดคำติดปากและสบตากล้องให้ต่อเนื่องขึ้น'
+  }`;
+
+  const fluency =
+    m.fillerCount === 0
+      ? 'พูดได้ต่อเนื่องลื่นไหลมาก ตลอดการซ้อมไม่พบคำฟุ่มเฟือยรบกวนผู้ฟังเลย'
+      : `ตรวจพบคำฟุ่มเฟือย ${m.fillerCount} ครั้ง (${m.fillerPerMinute} ครั้ง/นาที)${
+          body.fillerWordsSummary ? ` เช่น ${body.fillerWordsSummary}` : ''
+        } — ลองหยุดหายใจสั้นๆ แทนคำเชื่อมเหล่านี้จะช่วยให้ประโยคคมชัดขึ้น`;
+
+  const pacing =
+    m.averageSpm === 0
+      ? 'รอบนี้ยังจับจังหวะความเร็วการพูดได้น้อย แนะนำให้พูดใกล้ไมโครโฟนด้วยน้ำเสียงชัดเจนขึ้น'
+      : m.averageSpm > 220
+        ? `ความเร็วเฉลี่ยอยู่ที่ ${m.averageSpm} พยางค์/นาที ซึ่งเร็วกว่าเกณฑ์ 180–220 เล็กน้อย ลองเว้นวรรคหายใจท้ายประโยคจะฟังสบายขึ้น`
+        : m.averageSpm < 180
+          ? `ความเร็วเฉลี่ยอยู่ที่ ${m.averageSpm} พยางค์/นาที ค่อนข้างช้าสบายๆ ลองเพิ่มจังหวะให้กระชับเข้าช่วง 180–220 จะดูมีพลังขึ้น`
+          : `คุมจังหวะได้ดีเยี่ยมที่ ${m.averageSpm} พยางค์/นาที อยู่ในเกณฑ์มาตรฐาน 180–220 ฟังชัดเจนกำลังดี`;
+
+  const eye =
+    m.eyeContactRatio >= 80
+      ? `สบตากล้องได้สม่ำเสมอถึง ${m.eyeContactRatio}% สร้างความน่าเชื่อถือและการเชื่อมโยงกับผู้ฟังได้ดีมาก`
+      : `ระดับการสบตากล้องอยู่ที่ ${m.eyeContactRatio}% — แนะนำให้มองตรงเข้าเลนส์มากขึ้นและลดการเหลือบมองบนหรือก้มมองโพยนานเกินไป`;
+
+  const posture =
+    m.goodPostureRatio >= 85
+      ? `บุคลิกท่าทางมั่นคงถึง ${m.goodPostureRatio}% ดูสง่าและเป็นธรรมชาติตลอดคลิป`
+      : `คะแนนบุคลิกภาพอยู่ที่ ${m.goodPostureRatio}%${
+          body.postureIssuesSummary ? ` (พบ${body.postureIssuesSummary})` : ''
+        } — ลองยืดไหล่ตรงและผ่อนคลายช่วงแขนจะช่วยเสริมความมั่นใจขึ้นทันที`;
+
+  return {
+    overall,
+    fluency,
+    pacing,
+    eye,
+    posture,
+    source: 'telemetry-fallback',
   };
 }

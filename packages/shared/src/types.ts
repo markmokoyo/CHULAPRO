@@ -94,6 +94,15 @@ export interface SpeechContentAnalysis {
   source: 'gemini' | 'offline-fallback';
 }
 
+export interface StarEvaluationFeedback {
+  overall: string;
+  fluency: string;
+  pacing: string;
+  eye: string;
+  posture: string;
+  source: 'gemini-video' | 'gemini-telemetry' | 'telemetry-fallback';
+}
+
 export interface SessionReport {
   sessionId: string;
   mode: 'solo' | 'team';
@@ -108,6 +117,7 @@ export interface SessionReport {
   telemetryTimeline: TelemetrySnapshot[];
   transcriptSegments: TranscriptSegment[];
   speechAnalysis?: SpeechContentAnalysis;
+  starEvaluation?: StarEvaluationFeedback;
   audienceHistory?: AudienceMessage[];
   aiFeedbackSummary?: string;
   createdAt: string;

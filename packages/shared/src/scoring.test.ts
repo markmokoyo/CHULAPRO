@@ -7,6 +7,7 @@ import {
   calculatePacingScore,
   CooldownManager,
   detectLexicalFillers,
+  scoreToStars,
 } from './scoring';
 import type { TeamMemberProfile, TelemetrySnapshot } from './types';
 
@@ -42,6 +43,11 @@ describe('Scoring Engine', () => {
       fillerPerMinute: 0,
     });
     expect(speechFocused).toBe(65);
+    expect(scoreToStars(95)).toBe(5);
+    expect(scoreToStars(80)).toBe(4);
+    expect(scoreToStars(65)).toBe(3);
+    expect(scoreToStars(45)).toBe(2);
+    expect(scoreToStars(20)).toBe(1);
   });
 });
 

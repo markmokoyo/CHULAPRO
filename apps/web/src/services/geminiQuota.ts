@@ -237,3 +237,48 @@ export async function generateGeminiJson<T>(
 
   throw lastErr ?? new Error('Gemini JSON generation failed');
 }
+
+export type GeminiInlinePart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
+export async function generateGeminiMultimodalJson<T>(
+  apiKey: string,
+  parts: GeminiInlinePart[]
+): Promise<{ data: T; totalTokens: number; modelUsed: string }> {
+  const ai = new GoogleGenAI({ apiKey });
+  let lastErr: unknown;
+
+  for (const model of MODEL_CANDIDATES) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts }],
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+      const jsonStr = extractJsonFromText(response.text ?? '');
+      const parsed = JSON.parse(jsonStr) as T;
+      return {
+        data: parsed,
+        totalTokens: response.usageMetadata?.totalTokenCount ?? 0,
+        modelUsed: model,
+      };
+    } catch (err) {
+      lastErr = err;
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+      if (
+        msg.includes('api_key_invalid') ||
+        msg.includes('401') ||
+        msg.includes('403') ||
+        msg.includes('429') ||
+        msg.includes('quota')
+      ) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastErr ?? new Error('Gemini multimodal JSON generation failed');
+}
