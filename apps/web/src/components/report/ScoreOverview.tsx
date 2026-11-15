@@ -185,7 +185,7 @@ export function ScoreOverview({
   return (
     <div className="space-y-4">
       {/* Top Full-Width Overall Score Banner */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-[#F9A8D4] bg-gradient-to-r from-[#EC3D6A] via-[#F472B6] to-[#8B5CF6] px-6 py-6 sm:px-8 text-center sm:text-left shadow-md shadow-[#EC3D6A]/20">
+      <div className="animate-fade-up flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-[#F9A8D4] bg-gradient-to-r from-[#EC3D6A] via-[#F472B6] to-[#8B5CF6] px-6 py-6 sm:px-8 text-center sm:text-left shadow-md shadow-[#EC3D6A]/20">
         <div className="space-y-1">
           <span className="text-xs font-semibold uppercase tracking-wider text-white/90">
             คะแนนการนำเสนอ
@@ -199,7 +199,7 @@ export function ScoreOverview({
         </div>
 
         <div className="flex flex-col items-center sm:items-end gap-2 max-w-xl">
-          <div className="rounded-full bg-white/95 px-4 py-1.5 shadow-sm">
+          <div className="rounded-full bg-white/95 px-4 py-1.5 shadow-sm transition-transform duration-300 hover:scale-[1.03]">
             <StarDisplay stars={overallStars} size="lg" />
           </div>
           <p className="text-sm sm:text-base font-medium text-white/95 leading-relaxed sm:text-right">
@@ -212,12 +212,14 @@ export function ScoreOverview({
 
       {/* 4 Sub-Metric Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((c) => {
+        {cards.map((c, idx) => {
           const Icon = c.icon;
+          const staggerCls =
+            idx === 1 ? 'stagger-1' : idx === 2 ? 'stagger-2' : idx === 3 ? 'stagger-3' : '';
           return (
             <div
               key={c.label}
-              className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${c.cardCls}`}
+              className={`app-card animate-fade-up ${staggerCls} rounded-2xl border p-5 shadow-sm hover:shadow-md ${c.cardCls}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs sm:text-sm font-semibold text-slate-600">{c.label}</p>
@@ -241,7 +243,7 @@ export function ScoreOverview({
       </div>
 
       {/* 5-Star Evaluation Breakdown */}
-      <div className="rounded-2xl border border-[#E8DCE0] bg-white p-5 sm:p-6 shadow-sm space-y-4">
+      <div className="animate-fade-up stagger-2 rounded-2xl border border-[#E8DCE0] bg-white p-5 sm:p-6 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E8DCE0] pb-3.5">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-[#BE2257]">
