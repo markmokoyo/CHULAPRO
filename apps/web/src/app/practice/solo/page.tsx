@@ -13,6 +13,8 @@ import {
   Minimize2,
   Square,
   UserCheck,
+  Video,
+  VideoOff,
 } from 'lucide-react';
 import {
   buildSessionReport,
@@ -77,6 +79,7 @@ export default function SoloPracticePage() {
   const [isFullscreenStage, setIsFullscreenStage] = useState(true);
   const [showPipPrompt, setShowPipPrompt] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [recordVideo, setRecordVideo] = useState(true);
   const [liveAlertsEnabled, setLiveAlertsEnabled] = useState(true);
   const [liveAuraReason, setLiveAuraReason] = useState<AlertReason | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -235,7 +238,7 @@ export default function SoloPracticePage() {
       transcriptsRef.current = [];
       slideWarnedRef.current.clear();
       cooldownRef.current.reset();
-      recorderRef.current = createSessionVideoRecorder(stream);
+      recorderRef.current = recordVideo ? createSessionVideoRecorder(stream) : null;
       setLiveAuraReason(null);
       setIsFullscreenStage(true);
       setElapsedSec(0);
@@ -471,7 +474,22 @@ export default function SoloPracticePage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+          {!isRunning && (
+            <button
+              type="button"
+              onClick={() => setRecordVideo((v) => !v)}
+              className="app-press inline-flex items-center gap-1.5 rounded-xl border border-[#D8C5CB] bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#FAF6F7]"
+            >
+              {recordVideo ? (
+                <Video className="h-4 w-4 text-[#EC3D6A]" />
+              ) : (
+                <VideoOff className="h-4 w-4 text-slate-400" />
+              )}
+              {recordVideo ? 'บันทึกวิดีโอ: เปิด' : 'บันทึกวิดีโอ: ปิด'}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setShowOverlay((v) => !v)}
@@ -549,10 +567,18 @@ export default function SoloPracticePage() {
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
                   <span
                     className={`h-2 w-2 rounded-full ${
-                      isRunning ? 'bg-rose-500 animate-pulse' : 'bg-[#FF8FAB]'
+                      isRunning
+                        ? recordVideo
+                          ? 'bg-rose-500 animate-pulse'
+                          : 'bg-emerald-400 animate-pulse'
+                        : 'bg-[#FF8FAB]'
                     }`}
                   />
-                  {isRunning ? `กำลังบันทึกวิดีโอ • ${mm}:${ss}` : 'เตรียมพร้อมเปิดกล้อง'}
+                  {isRunning
+                    ? recordVideo
+                      ? `กำลังบันทึกวิดีโอ • ${mm}:${ss}`
+                      : `กำลังซ้อม (ไม่บันทึกวิดีโอ) • ${mm}:${ss}`
+                    : 'เตรียมพร้อมเปิดกล้อง'}
                 </div>
 
                 {activePlan && (

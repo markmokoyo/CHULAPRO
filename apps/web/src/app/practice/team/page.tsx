@@ -12,6 +12,8 @@ import {
   Square,
   Trash2,
   Users,
+  Video,
+  VideoOff,
 } from 'lucide-react';
 import {
   buildTeamSessionReport,
@@ -84,6 +86,7 @@ export default function TeamPracticePage() {
   const [activeCue, setActiveCue] = useState<HapticCueEvent | null>(null);
   const [cooldownRemainingMs, setCooldownRemainingMs] = useState(0);
   const [liveAlertsEnabled, setLiveAlertsEnabled] = useState(true);
+  const [recordVideo, setRecordVideo] = useState(true);
   const [isFullscreenStage, setIsFullscreenStage] = useState(true);
   const [showPipPrompt, setShowPipPrompt] = useState(false);
   const [liveAuraReason, setLiveAuraReason] = useState<AlertReason | null>(null);
@@ -237,7 +240,7 @@ export default function TeamPracticePage() {
       transcriptsRef.current = [];
       lipTrackerRef.current.reset();
       cooldownRef.current.reset();
-      recorderRef.current = createSessionVideoRecorder(stream);
+      recorderRef.current = recordVideo ? createSessionVideoRecorder(stream) : null;
       setLiveAuraReason(null);
       setIsFullscreenStage(true);
     } catch (err) {
@@ -461,19 +464,34 @@ export default function TeamPracticePage() {
             ))}
           </div>
 
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void startTeamSession()}
-            className="app-press w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-5 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-50"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Camera className="h-4 w-4" />
-            )}
-            เริ่มซ้อมโหมดทีม
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void startTeamSession()}
+              className="app-press w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-5 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+              เริ่มซ้อมโหมดทีม
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRecordVideo((v) => !v)}
+              className="app-press w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C5CB] bg-white hover:bg-[#FAF6F7] px-4 py-3 text-xs font-semibold text-slate-700"
+            >
+              {recordVideo ? (
+                <Video className="h-4 w-4 text-[#EC3D6A]" />
+              ) : (
+                <VideoOff className="h-4 w-4 text-slate-400" />
+              )}
+              {recordVideo ? 'บันทึกวิดีโอย้อนหลัง: เปิด' : 'บันทึกวิดีโอย้อนหลัง: ปิด'}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid gap-5 lg:grid-cols-12">
@@ -501,8 +519,12 @@ export default function TeamPracticePage() {
               <div className="absolute inset-x-3 top-3 sm:inset-x-5 sm:top-4 z-30 flex flex-wrap items-center justify-between gap-2">
                 <div className="pointer-events-none flex flex-wrap items-center gap-2">
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
-                    <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                    กำลังบันทึกวิดีโอ • {String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:{String(elapsedSec % 60).padStart(2, '0')}
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        recordVideo ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400 animate-pulse'
+                      }`}
+                    />
+                    {recordVideo ? 'กำลังบันทึกวิดีโอ' : 'กำลังซ้อม (ไม่บันทึกวิดีโอ)'} • {String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:{String(elapsedSec % 60).padStart(2, '0')}
                   </div>
                   <div className="rounded-full bg-white/95 border border-[#E8DCE0] px-3 py-1.5 text-xs shadow-sm">
                     <span className="text-slate-500">ผู้พูดปัจจุบัน: </span>
