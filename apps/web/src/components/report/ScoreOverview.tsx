@@ -191,7 +191,7 @@ export function ScoreOverview({
             คะแนนการนำเสนอ
           </span>
           <div className="flex items-baseline justify-center sm:justify-start gap-2">
-            <span className="text-5xl sm:text-6xl font-extrabold text-white tabular-nums">
+            <span className="font-display text-5xl sm:text-6xl font-extrabold text-white tabular-nums">
               {overallScore}
             </span>
             <span className="text-sm font-medium text-white/90">/ 100 คะแนน</span>
@@ -202,7 +202,7 @@ export function ScoreOverview({
           <div className="rounded-full bg-white/95 px-4 py-1.5 shadow-sm">
             <StarDisplay stars={overallStars} size="lg" />
           </div>
-          <p className="text-xs sm:text-sm font-medium text-white/95 leading-relaxed sm:text-right">
+          <p className="text-sm sm:text-base font-medium text-white/95 leading-relaxed sm:text-right">
             {starEvalLoading && !starEvaluation
               ? 'กำลังวิเคราะห์วิดีโอจริงของคุณเพื่อสร้างคำแนะนำเฉพาะบุคคล...'
               : evaluations[0].feedback}
@@ -220,14 +220,14 @@ export function ScoreOverview({
               className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${c.cardCls}`}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-slate-600">{c.label}</p>
+                <p className="text-xs sm:text-sm font-semibold text-slate-600">{c.label}</p>
                 <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${c.iconCls}`}>
                   <Icon className="h-4 w-4" />
                 </span>
               </div>
-              <p className="mt-2.5 text-2xl font-bold text-[#2B2135] tabular-nums">{c.value}</p>
+              <p className="font-display mt-2.5 text-2xl font-bold text-[#2B2135] tabular-nums">{c.value}</p>
               <span
-                className={`mt-2 inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                className={`mt-2 inline-block rounded-md px-2 py-0.5 text-xs font-medium ${
                   c.ok
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -247,7 +247,7 @@ export function ScoreOverview({
             <span className="text-xs font-semibold uppercase tracking-wider text-[#BE2257]">
               5-Star Evaluation Summary
             </span>
-            <h2 className="text-lg sm:text-xl font-extrabold text-[#1F161A]">
+            <h2 className="font-display text-lg sm:text-xl font-extrabold text-[#1F161A]">
               สรุปผลการประเมินแยกตามหัวข้อ
             </h2>
           </div>

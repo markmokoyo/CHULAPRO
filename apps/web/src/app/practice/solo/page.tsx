@@ -600,40 +600,73 @@ export default function SoloPracticePage() {
               </div>
 
               {isRunning && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {isFullscreenStage && (
+                <>
+                  {/* Desktop full controls */}
+                  <div className="hidden sm:flex flex-wrap items-center gap-2">
+                    {isFullscreenStage && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPipPrompt((v) => !v)}
+                        className="app-press inline-flex min-h-[38px] items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3.5 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-[#0EA5E9]" />
+                        {showPipPrompt ? 'ซ่อนสไลด์/สคริปต์' : 'ดูสไลด์/สคริปต์'}
+                      </button>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() => setShowPipPrompt((v) => !v)}
-                      className="app-press inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
+                      onClick={() => setShowOverlay((v) => !v)}
+                      className="app-press inline-flex min-h-[38px] items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3.5 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
                     >
-                      <FileText className="h-3.5 w-3.5 text-[#0EA5E9]" />
-                      {showPipPrompt ? 'ซ่อนสไลด์/สคริปต์' : 'ดูสไลด์/สคริปต์'}
+                      {showOverlay ? (
+                        <Eye className="h-3.5 w-3.5 text-[#8B5CF6]" />
+                      ) : (
+                        <EyeOff className="h-3.5 w-3.5 text-slate-400" />
+                      )}
+                      เส้นโครง
                     </button>
-                  )}
 
-                  <button
-                    type="button"
-                    onClick={() => setShowOverlay((v) => !v)}
-                    className="app-press inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
-                  >
-                    {showOverlay ? (
-                      <Eye className="h-3.5 w-3.5 text-[#8B5CF6]" />
-                    ) : (
-                      <EyeOff className="h-3.5 w-3.5 text-slate-400" />
+                    <button
+                      type="button"
+                      onClick={() => setIsFullscreenStage((v) => !v)}
+                      className="app-press inline-flex min-h-[38px] items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3.5 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
+                    >
+                      {isFullscreenStage ? (
+                        <>
+                          <Minimize2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
+                          ย่อหน้าต่าง
+                        </>
+                      ) : (
+                        <>
+                          <Maximize2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
+                          เต็มจอ
+                        </>
+                      )}
+                    </button>
+
+                    {isFullscreenStage && (
+                      <button
+                        type="button"
+                        onClick={() => void finishAndSave()}
+                        className="app-press inline-flex min-h-[38px] items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg"
+                      >
+                        <Square className="h-3.5 w-3.5" />
+                        จบการซ้อม & ดูผลคะแนน
+                      </button>
                     )}
-                    เส้นโครง
-                  </button>
+                  </div>
 
+                  {/* Mobile compact top toggle so top bar stays clean 1 line */}
                   <button
                     type="button"
                     onClick={() => setIsFullscreenStage((v) => !v)}
-                    className="app-press inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
+                    className="sm:hidden app-press inline-flex min-h-[36px] items-center gap-1 rounded-full border border-white/60 bg-white/90 px-3 py-1 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
                   >
                     {isFullscreenStage ? (
                       <>
                         <Minimize2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
-                        ย่อหน้าต่าง
+                        ย่อจอ
                       </>
                     ) : (
                       <>
@@ -642,24 +675,47 @@ export default function SoloPracticePage() {
                       </>
                     )}
                   </button>
-
-                  {isFullscreenStage && (
-                    <button
-                      type="button"
-                      onClick={() => void finishAndSave()}
-                      className="app-press inline-flex items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg"
-                    >
-                      <Square className="h-3.5 w-3.5" />
-                      จบการซ้อม & ดูผลคะแนน
-                    </button>
-                  )}
-                </div>
+                </>
               )}
             </div>
 
+            {/* Mobile/Tablet Bottom Control Dock in Fullscreen Stage */}
+            {isRunning && isFullscreenStage && (
+              <div className="sm:hidden absolute inset-x-3 bottom-4 pb-safe z-30 flex items-center justify-between gap-2 rounded-2xl border border-white/25 bg-slate-950/80 p-2 backdrop-blur-md shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => setShowPipPrompt((v) => !v)}
+                  className="app-press inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/95 px-2.5 text-xs font-bold text-[#2B2135]"
+                >
+                  <FileText className="h-4 w-4 text-[#0EA5E9]" />
+                  {showPipPrompt ? 'ซ่อนสคริปต์' : 'สไลด์/สคริปต์'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOverlay((v) => !v)}
+                  className="app-press inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl bg-white/95 px-3 text-xs font-bold text-[#2B2135]"
+                >
+                  {showOverlay ? (
+                    <Eye className="h-4 w-4 text-[#8B5CF6]" />
+                  ) : (
+                    <EyeOff className="h-4 w-4 text-slate-400" />
+                  )}
+                  โครง
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void finishAndSave()}
+                  className="app-press inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-3 text-xs font-bold text-white shadow-sm"
+                >
+                  <Square className="h-3.5 w-3.5" />
+                  จบซ้อม & ดูผล
+                </button>
+              </div>
+            )}
+
             {/* Optional Picture-in-Picture Slide / Script Card during Fullscreen */}
             {isRunning && isFullscreenStage && showPipPrompt && (
-              <div className="absolute bottom-16 right-4 z-30 w-80 max-w-[90vw] max-h-[60vh] overflow-y-auto rounded-2xl shadow-2xl">
+              <div className="absolute inset-x-3 bottom-20 sm:inset-x-auto sm:bottom-16 sm:right-4 z-30 sm:w-96 max-h-[52vh] sm:max-h-[62vh] overflow-y-auto rounded-2xl shadow-2xl">
                 <SlideTeleprompter
                   plan={activePlan}
                   currentSlideIndex={slideIdx}
@@ -681,7 +737,7 @@ export default function SoloPracticePage() {
 
             {/* Live transcript caption in fullscreen stage */}
             {isRunning && isFullscreenStage && (interimText || lastSavedText) && (
-              <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 z-30 max-w-2xl rounded-full border border-white/60 bg-white/90 px-4 py-2 text-xs text-[#2B2135] backdrop-blur-md shadow-lg">
+              <div className="pointer-events-none absolute bottom-20 sm:bottom-5 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-20 max-w-2xl rounded-2xl sm:rounded-full border border-white/60 bg-white/90 px-4 py-2 text-xs sm:text-sm text-[#2B2135] backdrop-blur-md shadow-lg text-center">
                 {interimText ? (
                   <>
                     <span className="text-[#EC3D6A] font-semibold">กำลังพูด: </span>

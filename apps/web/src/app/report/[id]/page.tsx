@@ -448,7 +448,7 @@ export default function ReportDetailPage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             กลับหน้าหลัก
           </Link>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#2B2135]">
+          <h1 className="font-display text-xl sm:text-2xl font-bold text-[#2B2135]">
             รายงานผลการฝึกซ้อม ({report.mode === 'team' ? 'ซ้อมกลุ่ม' : 'ซ้อมเดี่ยว'})
           </h1>
           <p className="text-xs text-slate-500">
@@ -481,14 +481,14 @@ export default function ReportDetailPage() {
       <div
         role="tablist"
         aria-label="หมวดหมู่รายงานผล"
-        className="inline-flex flex-wrap gap-1 rounded-2xl border border-[#E8DCE0] bg-white/80 p-1.5 shadow-sm"
+        className="flex w-full sm:w-fit overflow-x-auto no-scrollbar gap-1.5 rounded-2xl border border-[#E8DCE0] bg-white/80 p-1.5 shadow-sm"
       >
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'overview'}
           onClick={() => setActiveTab('overview')}
-          className={`app-press inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+          className={`app-press inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition ${
             activeTab === 'overview'
               ? 'bg-gradient-to-r from-[#EC3D6A] to-[#F472B6] text-white shadow-sm'
               : 'text-slate-600 hover:bg-[#FFF0F5] hover:text-[#EC3D6A]'
@@ -503,7 +503,7 @@ export default function ReportDetailPage() {
           role="tab"
           aria-selected={activeTab === 'replay'}
           onClick={() => setActiveTab('replay')}
-          className={`app-press inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+          className={`app-press inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition ${
             activeTab === 'replay'
               ? 'bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] text-white shadow-sm'
               : 'text-slate-600 hover:bg-[#F0F9FF] hover:text-[#0284C7]'
@@ -519,7 +519,7 @@ export default function ReportDetailPage() {
             role="tab"
             aria-selected={activeTab === 'team'}
             onClick={() => setActiveTab('team')}
-            className={`app-press inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+            className={`app-press inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition ${
               activeTab === 'team'
                 ? 'bg-gradient-to-r from-[#8B5CF6] to-[#A78BFA] text-white shadow-sm'
                 : 'text-slate-600 hover:bg-[#F5F3FF] hover:text-[#7C3AED]'

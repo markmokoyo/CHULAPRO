@@ -86,11 +86,11 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <h1 className="text-2xl font-bold tracking-tight text-[#2B2135] sm:text-3xl leading-snug">
+            <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#2B2135] leading-snug">
               ซ้อมพูดให้คล่องและคุมเวลาให้แม่นยำ ก่อนขึ้นเวทีจริง
             </h1>
 
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
               แบ่งเวลาพูดต่อสไลด์ จับคำติดปากภาษาไทย ตรวจจังหวะการพูดและมุมสายตา
               พร้อมตัวจำลองสัญญาณสั่นบนสมาร์ทวอทช์เพื่อช่วยเตือนแบบไม่เสียสมาธิ
             </p>
@@ -98,21 +98,21 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row flex-wrap gap-2.5 pt-1">
               <Link
                 href="/practice/solo"
-                className="app-press inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#EC3D6A] to-[#F472B6] hover:brightness-105 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
+                className="app-press inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#EC3D6A] to-[#F472B6] hover:brightness-105 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
               >
                 <Mic className="h-4 w-4" />
                 เริ่มซ้อมเดี่ยว
               </Link>
               <Link
                 href="/planner"
-                className="app-press inline-flex items-center justify-center gap-2 rounded-xl border border-[#BAE6FD] bg-[#F0F9FF] hover:bg-[#E0F2FE] px-4 py-2.5 text-sm font-semibold text-[#0369A1]"
+                className="app-press inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[#BAE6FD] bg-[#F0F9FF] hover:bg-[#E0F2FE] px-4 py-2.5 text-sm font-semibold text-[#0369A1]"
               >
                 <FileText className="h-4 w-4 text-[#0EA5E9]" />
                 เตรียมสไลด์และกะเวลา
               </Link>
               <Link
                 href="/practice/team"
-                className="app-press inline-flex items-center justify-center gap-2 rounded-xl border border-[#DDD6FE] bg-[#F5F3FF] hover:bg-[#EDE9FE] px-4 py-2.5 text-sm font-semibold text-[#6D28D9]"
+                className="app-press inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[#DDD6FE] bg-[#F5F3FF] hover:bg-[#EDE9FE] px-4 py-2.5 text-sm font-semibold text-[#6D28D9]"
               >
                 <Users className="h-4 w-4 text-[#8B5CF6]" />
                 ซ้อมเป็นกลุ่ม
@@ -134,6 +134,59 @@ export default function DashboardPage() {
               </span>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* 3-Step Guided UX Workflow Bar (UXpert Visual Hierarchy) */}
+      <section aria-label="ขั้นตอนการใช้งาน 3 ขั้น" className="grid gap-3 sm:grid-cols-3">
+        <Link
+          href="/planner"
+          className="app-card group rounded-2xl border border-[#E8DCE0] bg-white p-4 shadow-sm hover:border-[#BAE6FD]"
+        >
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="inline-flex items-center rounded-full bg-[#E0F2FE] px-2.5 py-0.5 text-xs font-bold text-[#0369A1]">
+              ขั้นที่ 1
+            </span>
+            <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-[#0EA5E9] transition" />
+          </div>
+          <h2 className="font-display text-sm sm:text-base font-bold text-[#2B2135]">
+            เตรียมสไลด์หรือสคริปต์
+          </h2>
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 leading-relaxed">
+            อัปโหลดไฟล์ PDF/PPTX ให้ AI แบ่งเวลาพูด หรือวางสคริปต์พูดสดได้ทันที
+          </p>
+        </Link>
+
+        <Link
+          href="/practice/solo"
+          className="app-card group rounded-2xl border border-[#E8DCE0] bg-white p-4 shadow-sm hover:border-[#FF9EB8]"
+        >
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="inline-flex items-center rounded-full bg-[#FCE8EE] px-2.5 py-0.5 text-xs font-bold text-[#BE2257]">
+              ขั้นที่ 2
+            </span>
+            <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-[#EC3D6A] transition" />
+          </div>
+          <h2 className="font-display text-sm sm:text-base font-bold text-[#2B2135]">
+            ซ้อมพูดหน้ากล้องเต็มจอ
+          </h2>
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 leading-relaxed">
+            ตรวจจับความเร็ว คำฟุ่มเฟือย และสายตา พร้อมแสงสีเตือนรอบขอบจอ
+          </p>
+        </Link>
+
+        <div className="rounded-2xl border border-[#E8DCE0] bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="inline-flex items-center rounded-full bg-[#EDE9FE] px-2.5 py-0.5 text-xs font-bold text-[#6D28D9]">
+              ขั้นที่ 3
+            </span>
+          </div>
+          <h2 className="font-display text-sm sm:text-base font-bold text-[#2B2135]">
+            ดูวิดีโอย้อนหลัง & รับผล 5 ดาว
+          </h2>
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 leading-relaxed">
+            ชมคลิปตัวเองย้อนหลังพร้อมคำชมจาก AI และซ้อมตอบคำถามกรรมการ
+          </p>
         </div>
       </section>
 

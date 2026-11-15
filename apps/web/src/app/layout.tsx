@@ -1,13 +1,22 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Noto_Sans_Thai } from 'next/font/google';
+import { Anuphan, IBM_Plex_Sans_Thai, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { Navbar } from '@/components/Navbar';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const notoThai = Noto_Sans_Thai({
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['500', '600', '700', '800'],
+  variable: '--font-jakarta',
+});
+const anuphan = Anuphan({
+  subsets: ['thai', 'latin'],
+  weight: ['500', '600', '700'],
+  variable: '--font-anuphan',
+});
+const ibmPlexThai = IBM_Plex_Sans_Thai({
   subsets: ['thai', 'latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-noto-thai',
+  variable: '--font-ibm-thai',
 });
 
 export const viewport: Viewport = {
@@ -33,10 +42,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`${inter.variable} ${notoThai.variable}`}>
+    <html
+      lang="th"
+      className={`${plusJakarta.variable} ${anuphan.variable} ${ibmPlexThai.variable}`}
+    >
       <body className="font-sans antialiased bg-[#FAF6F7] text-[#1F161A]">
         <Navbar />
-        <main className="mx-auto max-w-7xl px-4 pt-5 pb-28 sm:px-6 sm:pb-10 lg:px-8">
+        <main className="mx-auto max-w-7xl px-3.5 pt-4 pb-28 sm:px-6 sm:pt-6 sm:pb-12 lg:px-8">
           {children}
         </main>
       </body>

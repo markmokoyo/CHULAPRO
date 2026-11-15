@@ -5,7 +5,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-noto-thai)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-ibm-thai)', 'var(--font-jakarta)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-anuphan)', 'var(--font-jakarta)', 'system-ui', 'sans-serif'],
       },
       colors: {
         chula: {

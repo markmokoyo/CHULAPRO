@@ -127,7 +127,7 @@ export function AiQuotaBadge() {
           setOpen((v) => !v);
           void fetchStatus();
         }}
-        className="flex items-center gap-1.5 rounded-xl border border-[#FF9EB8] bg-white hover:bg-[#FFE0EA] px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition"
+        className="flex items-center gap-1.5 min-h-[38px] sm:min-h-[40px] rounded-xl border border-[#FF9EB8] bg-white hover:bg-[#FFE0EA] px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition"
         title="ดูสถานะและลิมิตการใช้งาน Gemini API"
       >
         <span className={`h-2 w-2 rounded-full ${statusColor}`} />
@@ -136,7 +136,7 @@ export function AiQuotaBadge() {
       </button>
 
       {open && quota && (
-        <div className="absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl border border-[#FF9EB8] bg-white p-4 shadow-xl shadow-[#FB6F92]/15 z-50 space-y-3 text-slate-800">
+        <div className="fixed right-3 left-3 sm:left-auto sm:absolute sm:right-0 mt-2 sm:w-80 max-h-[82vh] overflow-y-auto rounded-2xl border border-[#FF9EB8] bg-white p-4 shadow-xl shadow-[#FB6F92]/15 z-50 space-y-3 text-slate-800">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-bold text-slate-900">
