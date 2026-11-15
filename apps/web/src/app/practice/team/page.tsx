@@ -212,7 +212,13 @@ export default function TeamPracticePage() {
       audioRef.current = audioEngine;
 
       const recognizer = new ThaiSpeechRecognizer();
+      const hotwords = [
+        ...(plan?.technicalHotwords ?? []),
+        ...(plan?.slides.map((s) => s.title) ?? []),
+        ...(freeformTopic ? [freeformTopic] : []),
+      ];
       recognizer.start({
+        hotwords,
         onFinalTranscript: (text) => {
           const relMs = Date.now() - sessionStartRef.current;
           const speaker = activeSpeakerRef.current ?? members[0]?.memberId ?? 'm1';
@@ -344,6 +350,7 @@ export default function TeamPracticePage() {
   }, [step, members, plan, triggerCue]);
 
   const finishTeamSession = async () => {
+    speechRef.current?.stop();
     const recordedBlob = recorderRef.current ? await recorderRef.current.stop() : null;
     recorderRef.current = null;
     stopAll();
@@ -499,8 +506,8 @@ export default function TeamPracticePage() {
             <div
               className={
                 isFullscreenStage
-                  ? 'fixed inset-0 z-50 bg-slate-950 flex items-center justify-center overflow-hidden'
-                  : 'relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-slate-900 shadow-sm'
+                  ? 'fixed inset-0 z-50 bg-[#2A2038] flex items-center justify-center overflow-hidden'
+                  : 'relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-[#362947] shadow-sm'
               }
             >
               <video
@@ -518,17 +525,17 @@ export default function TeamPracticePage() {
 
               <div className="absolute inset-x-3 top-3 sm:inset-x-5 sm:top-4 z-30 flex flex-wrap items-center justify-between gap-2">
                 <div className="pointer-events-none flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md">
                     <span
                       className={`h-2 w-2 rounded-full ${
-                        recordVideo ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400 animate-pulse'
+                        recordVideo ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500 animate-pulse'
                       }`}
                     />
                     {recordVideo ? 'กำลังบันทึกวิดีโอ' : 'กำลังซ้อม (ไม่บันทึกวิดีโอ)'} • {String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:{String(elapsedSec % 60).padStart(2, '0')}
                   </div>
-                  <div className="rounded-full bg-white/95 border border-[#E8DCE0] px-3 py-1.5 text-xs shadow-sm">
+                  <div className="rounded-full bg-[#F5F3FF]/95 border border-[#DDD6FE] px-3 py-1.5 text-xs shadow-sm backdrop-blur-md">
                     <span className="text-slate-500">ผู้พูดปัจจุบัน: </span>
-                    <span className="font-bold text-[#BE2257]">{activeMemberName}</span>
+                    <span className="font-bold text-[#6D28D9]">{activeMemberName}</span>
                   </div>
                 </div>
 
@@ -537,9 +544,9 @@ export default function TeamPracticePage() {
                     <button
                       type="button"
                       onClick={() => setShowPipPrompt((v) => !v)}
-                      className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                      className="app-press inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
                     >
-                      <FileText className="h-3.5 w-3.5 text-[#FF8FAB]" />
+                      <FileText className="h-3.5 w-3.5 text-[#0EA5E9]" />
                       {showPipPrompt ? 'ซ่อนสไลด์/สคริปต์' : 'ดูสไลด์/สคริปต์'}
                     </button>
                   )}
@@ -547,16 +554,16 @@ export default function TeamPracticePage() {
                   <button
                     type="button"
                     onClick={() => setIsFullscreenStage((v) => !v)}
-                    className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                    className="app-press inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
                   >
                     {isFullscreenStage ? (
                       <>
-                        <Minimize2 className="h-3.5 w-3.5" />
+                        <Minimize2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
                         ย่อหน้าต่าง
                       </>
                     ) : (
                       <>
-                        <Maximize2 className="h-3.5 w-3.5" />
+                        <Maximize2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
                         เต็มจอ
                       </>
                     )}

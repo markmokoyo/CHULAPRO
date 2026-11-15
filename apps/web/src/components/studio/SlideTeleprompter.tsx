@@ -233,7 +233,7 @@ export function SlideTeleprompter({
               </div>
             )}
 
-            <span className="absolute bottom-2 right-2 rounded-md bg-slate-900/75 px-2 py-0.5 text-[10px] font-semibold text-white tabular-nums backdrop-blur-sm">
+            <span className="absolute bottom-2 right-2 rounded-md border border-white/70 bg-white/90 px-2 py-0.5 text-[10px] font-bold text-[#0369A1] tabular-nums shadow-sm backdrop-blur-sm">
               หน้า {slide.slideNumber} / {plan.slides.length}
             </span>
           </div>

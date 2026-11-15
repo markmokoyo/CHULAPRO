@@ -627,8 +627,8 @@ export default function PlannerPage() {
                 )}
 
                 <div className="grid gap-2.5 sm:grid-cols-2 pt-1">
-                  <div className="rounded-xl bg-[#FAF6F7] border border-[#E8DCE0] p-3 text-xs">
-                    <div className="font-semibold text-[#BE2257] mb-1">
+                  <div className="rounded-xl bg-[#F0F9FF] border border-[#BAE6FD] p-3 text-xs">
+                    <div className="font-semibold text-[#0369A1] mb-1">
                       ประโยคเปิดเรื่องแนะนำ
                     </div>
                     <p className="text-slate-700 leading-relaxed">
@@ -636,8 +636,8 @@ export default function PlannerPage() {
                     </p>
                   </div>
                   {plan.closingStatement && (
-                    <div className="rounded-xl bg-[#FAF6F7] border border-[#E8DCE0] p-3 text-xs">
-                      <div className="font-semibold text-[#1F161A] mb-1">
+                    <div className="rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] p-3 text-xs">
+                      <div className="font-semibold text-[#047857] mb-1">
                         ประโยคปิดท้ายแนะนำ
                       </div>
                       <p className="text-slate-700 leading-relaxed">
@@ -681,7 +681,7 @@ export default function PlannerPage() {
                                 </p>
                               </div>
                             )}
-                            <span className="absolute bottom-2 left-2 rounded-md bg-slate-900/75 px-2 py-0.5 text-[10px] font-semibold text-white tabular-nums">
+                            <span className="absolute bottom-2 left-2 rounded-md border border-white/70 bg-white/90 px-2 py-0.5 text-[10px] font-bold text-[#6D28D9] shadow-sm backdrop-blur-sm tabular-nums">
                               หน้า {s.slideNumber}
                             </span>
                           </div>
@@ -719,8 +719,8 @@ export default function PlannerPage() {
                                 พยางค์
                               </p>
                             </div>
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-[#FCE8EE] px-2.5 py-1 text-xs font-semibold text-[#BE2257] tabular-nums shrink-0">
-                              <Clock className="h-3.5 w-3.5 text-[#EC3D6A]" />
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-[#DDD6FE] bg-[#F5F3FF] px-2.5 py-1 text-xs font-semibold text-[#6D28D9] tabular-nums shrink-0">
+                              <Clock className="h-3.5 w-3.5 text-[#8B5CF6]" />
                               {s.allocatedSeconds} วินาที
                             </span>
                           </div>

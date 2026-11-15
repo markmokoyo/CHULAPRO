@@ -89,6 +89,7 @@ export default function SoloPracticePage() {
   const [liveEyeScore, setLiveEyeScore] = useState(100);
   const [livePostureScore, setLivePostureScore] = useState(100);
   const [interimText, setInterimText] = useState('');
+  const [lastSavedText, setLastSavedText] = useState('');
   const [activeCue, setActiveCue] = useState<HapticCueEvent | null>(null);
   const [cooldownRemainingMs, setCooldownRemainingMs] = useState(0);
 
@@ -207,7 +208,13 @@ export default function SoloPracticePage() {
       audioRef.current = audioEngine;
 
       const recognizer = new ThaiSpeechRecognizer();
+      const hotwords = [
+        ...(plan?.technicalHotwords ?? []),
+        ...(plan?.slides.map((s) => s.title) ?? []),
+        ...(freeformTopic ? [freeformTopic] : []),
+      ];
       recognizer.start({
+        hotwords,
         onFinalTranscript: (text) => {
           const relMs = Date.now() - sessionStartMsRef.current;
           const slideNum = plan?.slides[slideIdxRef.current]?.slideNumber ?? 1;
@@ -217,6 +224,7 @@ export default function SoloPracticePage() {
             startMs: Math.max(0, relMs - 2000),
             endMs: relMs,
           });
+          setLastSavedText(text);
           const found = detectLexicalFillers(text, relMs, slideNum, 'solo');
           if (found.length > 0) {
             fillersRef.current.push(...found);
@@ -228,6 +236,7 @@ export default function SoloPracticePage() {
         onInterimTranscript: (text) => setInterimText(text),
       });
       speechRef.current = recognizer;
+      setLastSavedText('');
 
       sessionStartMsRef.current = Date.now();
       baselineRef.current = null;
@@ -422,6 +431,8 @@ export default function SoloPracticePage() {
   }, [isRunning, plan, triggerCue]);
 
   const finishAndSave = async () => {
+    // Stop speech recognizer first so any pending interim text is flushed into transcriptsRef
+    speechRef.current?.stop();
     const recordedBlob = recorderRef.current ? await recorderRef.current.stop() : null;
     recorderRef.current = null;
     stopEngines();
@@ -542,8 +553,8 @@ export default function SoloPracticePage() {
           <div
             className={
               isRunning && isFullscreenStage
-                ? 'fixed inset-0 z-50 bg-slate-950 flex items-center justify-center overflow-hidden'
-                : 'relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-slate-900 shadow-sm'
+                ? 'fixed inset-0 z-50 bg-[#2A2038] flex items-center justify-center overflow-hidden'
+                : 'relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-[#362947] shadow-sm'
             }
           >
             <video
@@ -564,14 +575,14 @@ export default function SoloPracticePage() {
             {/* Native Camera Floating HUD Pills */}
             <div className="absolute inset-x-3 top-3 sm:inset-x-5 sm:top-4 z-30 flex flex-wrap items-center justify-between gap-2">
               <div className="pointer-events-none flex items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md">
                   <span
                     className={`h-2 w-2 rounded-full ${
                       isRunning
                         ? recordVideo
                           ? 'bg-rose-500 animate-pulse'
-                          : 'bg-emerald-400 animate-pulse'
-                        : 'bg-[#FF8FAB]'
+                          : 'bg-emerald-500 animate-pulse'
+                        : 'bg-[#EC3D6A]'
                     }`}
                   />
                   {isRunning
@@ -582,7 +593,7 @@ export default function SoloPracticePage() {
                 </div>
 
                 {activePlan && (
-                  <div className="inline-flex items-center rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-[#BE2257] shadow-sm backdrop-blur-sm">
+                  <div className="inline-flex items-center rounded-full border border-[#BAE6FD] bg-[#F0F9FF]/95 px-3 py-1.5 text-xs font-bold text-[#0369A1] shadow-sm backdrop-blur-md">
                     สไลด์ {slideIdx + 1} / {activePlan.slides.length}
                   </div>
                 )}
@@ -594,9 +605,9 @@ export default function SoloPracticePage() {
                     <button
                       type="button"
                       onClick={() => setShowPipPrompt((v) => !v)}
-                      className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                      className="app-press inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
                     >
-                      <FileText className="h-3.5 w-3.5 text-[#FF8FAB]" />
+                      <FileText className="h-3.5 w-3.5 text-[#0EA5E9]" />
                       {showPipPrompt ? 'ซ่อนสไลด์/สคริปต์' : 'ดูสไลด์/สคริปต์'}
                     </button>
                   )}
@@ -604,12 +615,12 @@ export default function SoloPracticePage() {
                   <button
                     type="button"
                     onClick={() => setShowOverlay((v) => !v)}
-                    className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                    className="app-press inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
                   >
                     {showOverlay ? (
-                      <Eye className="h-3.5 w-3.5 text-[#FF8FAB]" />
+                      <Eye className="h-3.5 w-3.5 text-[#8B5CF6]" />
                     ) : (
-                      <EyeOff className="h-3.5 w-3.5 text-slate-300" />
+                      <EyeOff className="h-3.5 w-3.5 text-slate-400" />
                     )}
                     เส้นโครง
                   </button>
@@ -617,16 +628,16 @@ export default function SoloPracticePage() {
                   <button
                     type="button"
                     onClick={() => setIsFullscreenStage((v) => !v)}
-                    className="app-press inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+                    className="app-press inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/90 hover:bg-white px-3 py-1.5 text-xs font-semibold text-[#2B2135] shadow-sm backdrop-blur-md"
                   >
                     {isFullscreenStage ? (
                       <>
-                        <Minimize2 className="h-3.5 w-3.5" />
+                        <Minimize2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
                         ย่อหน้าต่าง
                       </>
                     ) : (
                       <>
-                        <Maximize2 className="h-3.5 w-3.5" />
+                        <Maximize2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
                         เต็มจอ
                       </>
                     )}
@@ -669,10 +680,19 @@ export default function SoloPracticePage() {
             )}
 
             {/* Live transcript caption in fullscreen stage */}
-            {isRunning && isFullscreenStage && interimText && (
-              <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 z-30 max-w-2xl rounded-full bg-slate-900/80 px-4 py-2 text-xs text-white backdrop-blur-md shadow-lg">
-                <span className="text-[#FF8FAB] font-semibold">กำลังพูด: </span>
-                {interimText}
+            {isRunning && isFullscreenStage && (interimText || lastSavedText) && (
+              <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 z-30 max-w-2xl rounded-full border border-white/60 bg-white/90 px-4 py-2 text-xs text-[#2B2135] backdrop-blur-md shadow-lg">
+                {interimText ? (
+                  <>
+                    <span className="text-[#EC3D6A] font-semibold">กำลังพูด: </span>
+                    {interimText}
+                  </>
+                ) : (
+                  <>
+                    <span className="text-emerald-600 font-semibold">บันทึกล่าสุด: </span>
+                    {lastSavedText}
+                  </>
+                )}
               </div>
             )}
 

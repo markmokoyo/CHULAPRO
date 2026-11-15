@@ -140,7 +140,7 @@ export function SessionVideoPlayer({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[#E8DCE0] bg-slate-950">
+      <div className="overflow-hidden rounded-2xl border border-[#DDD6FE] bg-[#362947]">
         <video
           ref={videoRef}
           src={videoUrl}

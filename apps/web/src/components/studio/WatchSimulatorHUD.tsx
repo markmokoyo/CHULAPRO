@@ -185,8 +185,8 @@ export function WatchSimulatorHUD({
             />
           </svg>
           <div
-            className={`relative flex h-[74px] w-[74px] flex-col items-center justify-center rounded-full border-2 bg-slate-900 text-center shadow-lg transition-all ${
-              displayCue ? `animate-watch-buzz ${style?.ring}` : 'border-[#E8DCE0]'
+            className={`relative flex h-[74px] w-[74px] flex-col items-center justify-center rounded-full border-2 bg-gradient-to-br from-[#3D2C56] to-[#573A7A] text-center shadow-lg transition-all ${
+              displayCue ? `animate-watch-buzz ${style?.ring}` : 'border-[#DDD6FE]'
             }`}
           >
             {displayCue ? (

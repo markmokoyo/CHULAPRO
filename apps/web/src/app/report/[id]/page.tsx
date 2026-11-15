@@ -1,21 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
-  CheckCircle2,
+  Check,
+  Edit3,
+  FileText,
   Loader2,
   MessageSquare,
-  Mic,
-  MicOff,
   RefreshCw,
-  Send,
-  Volume2,
+  Sparkles,
+  Users,
+  Video,
 } from 'lucide-react';
 import {
-  AUDIENCE_PERSONAS,
   type AudienceMessage,
   type PresentationPlan,
   type SpeechContentAnalysis,
@@ -34,45 +34,36 @@ import { ScoreOverview } from '@/components/report/ScoreOverview';
 import { TimelineChart } from '@/components/report/TimelineChart';
 import { TeamBreakdown } from '@/components/report/TeamBreakdown';
 import { SessionVideoPlayer } from '@/components/report/SessionVideoPlayer';
+import { PostPresentationQADrawer } from '@/components/report/PostPresentationQADrawer';
 import { speakQuestionNatural, stopSpeaking } from '@/services/voicePlayer';
 
-interface BrowserSpeechRecognition {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((e: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-}
+type ReportTab = 'overview' | 'replay' | 'team';
 
 export default function ReportDetailPage() {
   const params = useParams<{ id: string }>();
   const [report, setReport] = useState<AnySessionReport | null>(null);
   const [plan, setPlan] = useState<PresentationPlan | null>(null);
+  const [activeTab, setActiveTab] = useState<ReportTab>('overview');
+  const [qaDrawerOpen, setQaDrawerOpen] = useState(true);
+
   const [judgeLoading, setJudgeLoading] = useState(false);
   const [speechAnalysisLoading, setSpeechAnalysisLoading] = useState(false);
   const [judgeSource, setJudgeSource] = useState<string | null>(null);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
-  const [listeningId, setListeningId] = useState<string | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [voiceMode, setVoiceMode] = useState<'gemini' | 'browser'>('gemini');
 
+  const [isEditingTranscript, setIsEditingTranscript] = useState(false);
+  const [transcriptDraft, setTranscriptDraft] = useState('');
+
   const autoRequestedRef = useRef(false);
   const autoSpeechRequestedRef = useRef(false);
-  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
 
   useEffect(() => {
     return () => {
       stopSpeaking();
-      try {
-        recognitionRef.current?.stop();
-      } catch {
-        // Ignore cleanup error
-      }
     };
   }, []);
 
@@ -212,6 +203,7 @@ export default function ReportDetailPage() {
 
     setReport(found);
     setPlan(matchedPlan);
+    setTranscriptDraft(found.transcriptSegments.map((s) => s.text).join('\n'));
 
     const existingAnswers: Record<string, string> = {};
     found.audienceHistory?.forEach((q) => {
@@ -246,52 +238,6 @@ export default function ReportDetailPage() {
       onStart: () => setSpeakingId(q.id),
       onEnd: () => setSpeakingId((curr) => (curr === q.id ? null : curr)),
     });
-  };
-
-  const toggleVoiceAnswer = (questionId: string) => {
-    if (listeningId === questionId) {
-      recognitionRef.current?.stop();
-      setListeningId(null);
-      return;
-    }
-
-    const win = window as unknown as {
-      SpeechRecognition?: new () => BrowserSpeechRecognition;
-      webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
-    };
-    const Rec = win.SpeechRecognition || win.webkitSpeechRecognition;
-    if (!Rec) {
-      setAiNotice('เบราว์เซอร์นี้ไม่รองรับการรับเสียงพูด กรุณาพิมพ์คำตอบในช่องข้อความแทนครับ');
-      return;
-    }
-
-    try {
-      recognitionRef.current?.stop();
-    } catch {
-      // ignore
-    }
-
-    const rec = new Rec();
-    rec.lang = 'th-TH';
-    rec.continuous = true;
-    rec.interimResults = false;
-
-    rec.onresult = (e) => {
-      const latestIdx = e.results.length - 1;
-      const phrase = e.results[latestIdx]?.[0]?.transcript?.trim();
-      if (phrase) {
-        setDraftAnswers((prev) => ({
-          ...prev,
-          [questionId]: prev[questionId] ? `${prev[questionId]} ${phrase}` : phrase,
-        }));
-      }
-    };
-    rec.onerror = () => setListeningId(null);
-    rec.onend = () => setListeningId(null);
-
-    recognitionRef.current = rec;
-    setListeningId(questionId);
-    rec.start();
   };
 
   const submitAnswerForEvaluation = async (question: AudienceMessage) => {
@@ -350,6 +296,44 @@ export default function ReportDetailPage() {
     }
   };
 
+  const saveEditedTranscript = () => {
+    if (!report) return;
+    const lines = transcriptDraft
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const totalMs = report.durationSeconds * 1000;
+    const stepMs = lines.length > 0 ? Math.floor(totalMs / lines.length) : totalMs;
+
+    const updatedSegments = lines.map((text, i) => ({
+      speakerId: report.transcriptSegments[i]?.speakerId ?? (report.mode === 'team' ? 'm1' : 'solo'),
+      text,
+      startMs: report.transcriptSegments[i]?.startMs ?? i * stepMs,
+      endMs: report.transcriptSegments[i]?.endMs ?? (i + 1) * stepMs,
+    }));
+
+    const updatedReport: AnySessionReport = {
+      ...report,
+      transcriptSegments: updatedSegments,
+    };
+    saveSessionReport(updatedReport);
+    setReport(updatedReport);
+    setIsEditingTranscript(false);
+  };
+
+  const qaSummary = useMemo(() => {
+    const list = report?.audienceHistory ?? [];
+    const answered = list.filter((q) => q.evaluationScore !== undefined);
+    const avg =
+      answered.length > 0
+        ? Math.round(
+            answered.reduce((s, q) => s + (q.evaluationScore ?? 0), 0) /
+              answered.length
+          )
+        : null;
+    return { total: list.length, answeredCount: answered.length, avg };
+  }, [report?.audienceHistory]);
+
   if (!report) {
     return (
       <div className="rounded-2xl border border-[#E8DCE0] bg-white p-8 text-center space-y-3 shadow-sm">
@@ -366,7 +350,12 @@ export default function ReportDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={`space-y-5 transition-all duration-300 ${
+        qaDrawerOpen ? 'lg:pr-[440px]' : ''
+      }`}
+    >
+      {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link
@@ -376,7 +365,7 @@ export default function ReportDetailPage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             กลับหน้าหลัก
           </Link>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#1F161A]">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#2B2135]">
             รายงานผลการฝึกซ้อม ({report.mode === 'team' ? 'ซ้อมกลุ่ม' : 'ซ้อมเดี่ยว'})
           </h1>
           <p className="text-xs text-slate-500">
@@ -389,360 +378,308 @@ export default function ReportDetailPage() {
                 : ' • โหมดพูดอิสระ (ไม่ใช้สไลด์)'}
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setQaDrawerOpen((v) => !v)}
+          className="app-press inline-flex items-center gap-2 rounded-xl border border-[#DDD6FE] bg-gradient-to-r from-[#FFF0F5] to-[#F5F3FF] hover:brightness-95 px-3.5 py-2 text-xs font-bold text-[#6D28D9] shadow-sm"
+        >
+          <MessageSquare className="h-4 w-4 text-[#EC3D6A]" />
+          {qaDrawerOpen ? 'ซ่อนกล่องคำถามข้างจอ' : 'เปิดกล่องถาม-ตอบกรรมการ'}
+          {qaSummary.avg !== null && (
+            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#047857] border border-[#A7F3D0] tabular-nums">
+              Q&A {qaSummary.avg}
+            </span>
+          )}
+        </button>
       </div>
 
-      <ScoreOverview report={report} />
+      {/* Clean Sub-Tab Navigation to Prevent Clutter */}
+      <div
+        role="tablist"
+        aria-label="หมวดหมู่รายงานผล"
+        className="inline-flex flex-wrap gap-1 rounded-2xl border border-[#E8DCE0] bg-white/80 p-1.5 shadow-sm"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'overview'}
+          onClick={() => setActiveTab('overview')}
+          className={`app-press inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+            activeTab === 'overview'
+              ? 'bg-gradient-to-r from-[#EC3D6A] to-[#F472B6] text-white shadow-sm'
+              : 'text-slate-600 hover:bg-[#FFF0F5] hover:text-[#EC3D6A]'
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          ภาพรวม & วิเคราะห์เนื้อหา
+        </button>
 
-      <SessionVideoPlayer
-        sessionId={report.sessionId}
-        hapticCues={report.hapticCues}
-        fillers={report.fillers}
-      />
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'replay'}
+          onClick={() => setActiveTab('replay')}
+          className={`app-press inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+            activeTab === 'replay'
+              ? 'bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] text-white shadow-sm'
+              : 'text-slate-600 hover:bg-[#F0F9FF] hover:text-[#0284C7]'
+          }`}
+        >
+          <Video className="h-3.5 w-3.5" />
+          วิดีโอ & บันทึกคำพูด ({report.transcriptSegments.length})
+        </button>
 
-      {/* Slide-Free Speech Structure Analysis Card */}
-      {(!plan || report.speechAnalysis) && (
-        <section className="rounded-2xl border border-[#E8DCE0] bg-white p-5 sm:p-6 space-y-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E8DCE0] pb-3.5">
-            <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#BE2257]">
-                การวิเคราะห์เนื้อหาจากคำพูดจริง
-              </span>
-              <h2 className="text-base sm:text-lg font-bold text-[#1F161A]">
-                {report.speechAnalysis?.detectedTopic ||
-                  report.topicTitle ||
-                  'สรุปโครงสร้างคำพูด (โหมดไร้สไลด์)'}
-              </h2>
+        {report.mode === 'team' && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'team'}
+            onClick={() => setActiveTab('team')}
+            className={`app-press inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+              activeTab === 'team'
+                ? 'bg-gradient-to-r from-[#8B5CF6] to-[#A78BFA] text-white shadow-sm'
+                : 'text-slate-600 hover:bg-[#F5F3FF] hover:text-[#7C3AED]'
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            ผลวิเคราะห์รายบุคคล
+          </button>
+        )}
+      </div>
+
+      {/* Tab 1: Overview & Speech Content Analysis */}
+      {activeTab === 'overview' && (
+        <div className="space-y-5">
+          <ScoreOverview report={report} />
+
+          {/* Separated Q&A Quick Status Banner */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#DDD6FE] bg-gradient-to-r from-[#F5F3FF] via-white to-[#FFF0F5] px-5 py-4 shadow-sm">
+            <div className="space-y-0.5">
+              <div className="text-xs font-bold text-[#6D28D9]">
+                ช่วงถาม-ตอบหลังนำเสนอจบ (แยกวิเคราะห์ต่างหาก)
+              </div>
+              <p className="text-xs text-slate-600">
+                {qaSummary.answeredCount > 0
+                  ? `ตอบคำถามกรรมการแล้ว ${qaSummary.answeredCount}/${qaSummary.total} ข้อ • คะแนนเฉลี่ย Q&A ${qaSummary.avg}/100`
+                  : `มีคำถามรอฝึกตอบ ${qaSummary.total || 3} ข้อในกล่องด้านข้าง — กดฟังเสียงหรือพูดตอบด้วยไมค์ได้ทันที`}
+              </p>
             </div>
-
-            <div className="flex items-center gap-2">
-              {report.speechAnalysis && (
-                <span className="rounded-lg bg-[#FCE8EE] px-2.5 py-1 text-xs font-bold text-[#BE2257] tabular-nums">
-                  ความชัดเจนเนื้อหา {report.speechAnalysis.clarityScore}/100
-                </span>
-              )}
-              <button
-                type="button"
-                disabled={speechAnalysisLoading}
-                onClick={() => void generateSpeechAnalysis(report)}
-                className="app-press inline-flex items-center gap-1.5 rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] hover:bg-[#FCE8EE] px-3 py-1.5 text-xs font-semibold text-[#1F161A] disabled:opacity-50"
-              >
-                {speechAnalysisLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#EC3D6A]" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5 text-[#EC3D6A]" />
-                )}
-                วิเคราะห์คำพูดใหม่
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setQaDrawerOpen(true)}
+              className="app-press inline-flex items-center gap-1.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] px-3.5 py-2 text-xs font-bold text-white shadow-sm"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              เปิดกล่องตอบคำถามข้างจอ
+            </button>
           </div>
 
-          {speechAnalysisLoading && !report.speechAnalysis ? (
-            <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin text-[#EC3D6A]" />
-              กำลังสรุปและประเมินโครงสร้างคำพูดของคุณ...
-            </div>
-          ) : report.speechAnalysis ? (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-700 leading-relaxed">
-                {report.speechAnalysis.structureSummaryTh}
-              </p>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-[#E8DCE0] bg-[#FAF6F7] p-4 space-y-2">
-                  <h3 className="text-xs font-bold text-[#1F161A]">
-                    ประเด็นหลักที่ผู้ฟังจับใจความได้
-                  </h3>
-                  <ul className="space-y-1.5 text-xs text-slate-700">
-                    {report.speechAnalysis.keyTakeaways.map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="font-mono text-[11px] font-bold text-[#EC3D6A] mt-0.5">
-                          0{idx + 1}
-                        </span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
+          {/* Speech Content Analysis Card */}
+          {(!plan || report.speechAnalysis) && (
+            <section className="rounded-2xl border border-[#BAE6FD] bg-white p-5 sm:p-6 space-y-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E0F2FE] pb-3.5">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#0284C7]">
+                    การวิเคราะห์เนื้อหาจากคำพูดจริง
+                  </span>
+                  <h2 className="text-base sm:text-lg font-bold text-[#2B2135]">
+                    {report.speechAnalysis?.detectedTopic ||
+                      report.topicTitle ||
+                      'สรุปโครงสร้างคำพูด (โหมดไร้สไลด์)'}
+                  </h2>
                 </div>
 
-                <div className="rounded-xl border border-[#E8DCE0] bg-[#FAF6F7] p-4 space-y-2">
-                  <h3 className="text-xs font-bold text-[#BE2257]">
-                    คำแนะนำเพื่อปรับปรุงบทพูด
-                  </h3>
-                  <ul className="space-y-1.5 text-xs text-slate-700">
-                    {report.speechAnalysis.improvementsTh.map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#EC3D6A]" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <div className="flex items-center gap-2">
+                  {report.speechAnalysis && (
+                    <span className="rounded-lg bg-[#E0F2FE] px-2.5 py-1 text-xs font-bold text-[#0369A1] tabular-nums">
+                      ความชัดเจนเนื้อหา {report.speechAnalysis.clarityScore}/100
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    disabled={speechAnalysisLoading}
+                    onClick={() => void generateSpeechAnalysis(report)}
+                    className="app-press inline-flex items-center gap-1.5 rounded-xl border border-[#BAE6FD] bg-[#F0F9FF] hover:bg-[#E0F2FE] px-3 py-1.5 text-xs font-semibold text-[#0369A1] disabled:opacity-50"
+                  >
+                    {speechAnalysisLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    วิเคราะห์คำพูดใหม่
+                  </button>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-[#F2C4D0] bg-[#FCE8EE]/45 px-4 py-3 text-xs text-[#1F161A]">
-                <span className="font-semibold text-[#BE2257]">
-                  ตัวอย่างประโยคปิดท้ายที่คมขึ้น:{' '}
-                </span>
-                &ldquo;{report.speechAnalysis.suggestedClosingTh}&rdquo;
-              </div>
-            </div>
-          ) : null}
-        </section>
+              {speechAnalysisLoading && !report.speechAnalysis ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#0EA5E9]" />
+                  กำลังสรุปและประเมินโครงสร้างคำพูดของคุณ...
+                </div>
+              ) : report.speechAnalysis ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {report.speechAnalysis.structureSummaryTh}
+                  </p>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-[#A7F3D0] bg-[#ECFDF5]/60 p-4 space-y-2">
+                      <h3 className="text-xs font-bold text-[#047857]">
+                        ประเด็นหลักที่ผู้ฟังจับใจความได้
+                      </h3>
+                      <ul className="space-y-1.5 text-xs text-slate-700">
+                        {report.speechAnalysis.keyTakeaways.map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="font-mono text-[11px] font-bold text-[#059669] mt-0.5">
+                              0{idx + 1}
+                            </span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB]/70 p-4 space-y-2">
+                      <h3 className="text-xs font-bold text-[#B45309]">
+                        คำแนะนำเพื่อปรับปรุงบทพูด
+                      </h3>
+                      <ul className="space-y-1.5 text-xs text-slate-700">
+                        {report.speechAnalysis.improvementsTh.map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#F59E0B]" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#DDD6FE] bg-[#F5F3FF]/60 px-4 py-3 text-xs text-[#2B2135]">
+                    <span className="font-semibold text-[#6D28D9]">
+                      ตัวอย่างประโยคปิดท้ายที่คมขึ้น:{' '}
+                    </span>
+                    &ldquo;{report.speechAnalysis.suggestedClosingTh}&rdquo;
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          )}
+        </div>
       )}
 
-      {report.mode === 'team' && (
+      {/* Tab 2: Video Replay, Timeline & Editable Transcript */}
+      {activeTab === 'replay' && (
+        <div className="space-y-5">
+          <SessionVideoPlayer
+            sessionId={report.sessionId}
+            hapticCues={report.hapticCues}
+            fillers={report.fillers}
+          />
+
+          <TimelineChart
+            timeline={report.telemetryTimeline}
+            fillers={report.fillers}
+            hapticCues={report.hapticCues}
+          />
+
+          <div className="rounded-2xl border border-[#E8DCE0] bg-white p-5 space-y-3 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-base font-bold text-[#2B2135] flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#0EA5E9]" />
+                บันทึกคำพูด (Transcript)
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isEditingTranscript) {
+                    saveEditedTranscript();
+                  } else {
+                    setTranscriptDraft(
+                      report.transcriptSegments.map((s) => s.text).join('\n')
+                    );
+                    setIsEditingTranscript(true);
+                  }
+                }}
+                className={`app-press inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold ${
+                  isEditingTranscript
+                    ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#047857]'
+                    : 'border-[#BAE6FD] bg-[#F0F9FF] text-[#0369A1]'
+                }`}
+              >
+                {isEditingTranscript ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    บันทึกข้อความที่แก้ไข
+                  </>
+                ) : (
+                  <>
+                    <Edit3 className="h-3.5 w-3.5" />
+                    แก้ไขข้อความถอดเสียง
+                  </>
+                )}
+              </button>
+            </div>
+
+            {isEditingTranscript ? (
+              <textarea
+                rows={6}
+                value={transcriptDraft}
+                onChange={(e) => setTranscriptDraft(e.target.value)}
+                placeholder="พิมพ์หรือแก้ไขข้อความถอดเสียงให้ถูกต้องมากขึ้น (1 บรรทัดต่อ 1 ช่วงพูด)..."
+                className="w-full rounded-xl border border-[#BAE6FD] bg-[#F0F9FF]/40 p-3 text-xs sm:text-sm text-[#2B2135] focus:outline-none focus:border-[#0EA5E9]"
+              />
+            ) : report.transcriptSegments.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                ไม่มีข้อความถอดเสียงในเซสชันนี้ (แนะนำใช้ Google Chrome เพื่อเปิดใช้งาน Thai Web Speech หรือกดปุ่ม &ldquo;แก้ไขข้อความถอดเสียง&rdquo; เพื่อพิมพ์เพิ่ม)
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {report.transcriptSegments.map((seg, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-xl bg-[#FDF8FA] border border-[#E8DCE0] p-3 text-xs"
+                  >
+                    <span className="text-[#EC3D6A] font-semibold">
+                      [{Math.round(seg.startMs / 1000)}s • {seg.speakerId}]
+                    </span>{' '}
+                    <span className="text-slate-700">{seg.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Team Member Breakdown */}
+      {activeTab === 'team' && report.mode === 'team' && (
         <TeamBreakdown report={report as TeamSessionReport} />
       )}
 
-      {/* Post-Presentation Judge Panel Simulation */}
-      <section className="rounded-2xl border border-[#E8DCE0] border-l-4 border-l-[#EC3D6A] bg-white p-5 sm:p-6 space-y-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E8DCE0] pb-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base sm:text-lg font-bold text-[#1F161A] flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-[#EC3D6A]" />
-                จำลองคณะกรรมการถาม-ตอบหลังนำเสนอเสร็จ
-              </h2>
-              {judgeSource && (
-                <span
-                  className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold ${
-                    judgeSource === 'gemini'
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                      : 'bg-[#FAF6F7] border-[#E8DCE0] text-slate-600'
-                  }`}
-                >
-                  {judgeSource === 'gemini' ? 'ถามโดย Gemini AI' : 'ชุดคำถามมาตรฐาน'}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-slate-500">
-              กรรมการวิเคราะห์จากเนื้อหาสไลด์ คำพูดที่บันทึกได้ และจังหวะการนำเสนอของคุณ แล้วตั้งคำถามให้ฝึกตอบจริง
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() =>
-                setVoiceMode((m) => (m === 'gemini' ? 'browser' : 'gemini'))
-              }
-              title="สลับโหมดเสียงพูด (Gemini TTS เสียงธรรมชาติ ใช้ 1 คำขอ หรือเสียงเบราว์เซอร์)"
-              className="app-press inline-flex items-center gap-1.5 rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] hover:bg-[#FCE8EE] px-3 py-2 text-xs font-semibold text-[#1F161A]"
-            >
-              <Volume2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
-              {voiceMode === 'gemini' ? 'เสียง AI ธรรมชาติ' : 'เสียงเบราว์เซอร์'}
-            </button>
-
-            <button
-              type="button"
-              disabled={judgeLoading}
-              onClick={() => void generateJudgeQuestions(report, plan)}
-              className="app-press inline-flex items-center gap-1.5 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-3.5 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-50"
-            >
-              {judgeLoading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              ตั้งคำถามชุดใหม่จากกรรมการ (AI)
-            </button>
-          </div>
-        </div>
-
-        {aiNotice && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs text-amber-800">
-            {aiNotice}
-          </div>
-        )}
-
-        {judgeLoading && (!report.audienceHistory || report.audienceHistory.length === 0) ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin text-[#EC3D6A]" />
-            คณะกรรมการกำลังอ่านสไลด์และเตรียมคำถามให้คุณ...
-          </div>
-        ) : !report.audienceHistory || report.audienceHistory.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#D8C5CB] bg-[#FAF6F7] p-6 text-center text-xs text-slate-500">
-            กดปุ่ม &ldquo;ตั้งคำถามชุดใหม่จากกรรมการ (AI)&rdquo; เพื่อเริ่มช่วงถาม-ตอบ
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {report.audienceHistory.map((q, idx) => {
-              const isListening = listeningId === q.id;
-              const isEvaluating = evaluatingId === q.id;
-              return (
-                <div
-                  key={q.id}
-                  className="rounded-2xl border border-[#E8DCE0] bg-[#FAF6F7] p-4 sm:p-5 space-y-3"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-[#FCE8EE] px-2.5 py-0.5 text-xs font-bold text-[#BE2257]">
-                        ข้อที่ {idx + 1} • {AUDIENCE_PERSONAS[q.personaId]?.nameTh ?? 'กรรมการ'}
-                      </span>
-                      {q.categoryTh && (
-                        <span className="rounded-md bg-white border border-[#E8DCE0] px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                          {q.categoryTh}
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => speakQuestion(q)}
-                      className={`app-press inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
-                        speakingId === q.id
-                          ? 'border-[#EC3D6A] bg-[#FCE8EE] text-[#C82D57]'
-                          : 'border-[#D8C5CB] bg-white hover:bg-[#FCE8EE] text-[#1F161A]'
-                      }`}
-                    >
-                      <Volume2 className="h-3.5 w-3.5 text-[#EC3D6A]" />
-                      {speakingId === q.id ? 'กำลังอ่าน... (กดหยุด)' : 'ฟังเสียงคำถาม'}
-                    </button>
-                  </div>
-
-                  <p className="text-sm sm:text-base font-semibold text-[#1F161A] leading-relaxed">
-                    {q.text}
-                  </p>
-
-                  {(q.suggestedAnalogy || q.followUpTip) && (
-                    <div className="grid gap-2 sm:grid-cols-2 text-xs">
-                      {q.suggestedAnalogy && (
-                        <div className="rounded-xl border border-[#E8DCE0] bg-white p-2.5 text-slate-700">
-                          <span className="font-semibold text-[#BE2257]">แนวทางเปรียบเทียบ: </span>
-                          {q.suggestedAnalogy}
-                        </div>
-                      )}
-                      {q.followUpTip && (
-                        <div className="rounded-xl border border-[#E8DCE0] bg-white p-2.5 text-slate-700">
-                          <span className="font-semibold text-[#1F161A]">ทริคตอบกรรมการ: </span>
-                          {q.followUpTip}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Interactive Answer & Evaluation */}
-                  <div className="space-y-2 pt-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label
-                        htmlFor={`answer-${q.id}`}
-                        className="text-xs font-semibold text-slate-700"
-                      >
-                        ลองตอบคำถามนี้ด้วยเสียงหรือพิมพ์ข้อความ:
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => toggleVoiceAnswer(q.id)}
-                        className={`app-press inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border ${
-                          isListening
-                            ? 'bg-rose-600 text-white border-rose-600 animate-pulse'
-                            : 'bg-white text-[#1F161A] border-[#D8C5CB] hover:bg-[#FCE8EE]'
-                        }`}
-                      >
-                        {isListening ? (
-                          <>
-                            <MicOff className="h-3.5 w-3.5" />
-                            หยุดอัดเสียง
-                          </>
-                        ) : (
-                          <>
-                            <Mic className="h-3.5 w-3.5 text-[#EC3D6A]" />
-                            พูดตอบด้วยไมค์
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <textarea
-                      id={`answer-${q.id}`}
-                      rows={2}
-                      value={draftAnswers[q.id] ?? ''}
-                      onChange={(e) =>
-                        setDraftAnswers((prev) => ({
-                          ...prev,
-                          [q.id]: e.target.value,
-                        }))
-                      }
-                      placeholder="พิมพ์หรือพูดคำตอบของคุณที่นี่ เพื่อให้กรรมการประเมินคะแนนและช่วยเกลาคำพูด..."
-                      className="w-full rounded-xl border border-[#D8C5CB] bg-white px-3 py-2 text-xs sm:text-sm text-[#1F161A] placeholder:text-slate-400 focus:outline-none focus:border-[#EC3D6A]"
-                    />
-
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        disabled={isEvaluating || !(draftAnswers[q.id] ?? '').trim()}
-                        onClick={() => void submitAnswerForEvaluation(q)}
-                        className="app-press inline-flex items-center gap-1.5 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm disabled:opacity-45"
-                      >
-                        {isEvaluating ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Send className="h-3.5 w-3.5" />
-                        )}
-                        ส่งคำตอบให้กรรมการประเมิน
-                      </button>
-                    </div>
-                  </div>
-
-                  {q.evaluationScore !== undefined && (
-                    <div className="rounded-xl border border-emerald-200 bg-white p-3.5 space-y-1.5 text-xs">
-                      <div className="flex items-center gap-2 font-bold text-emerald-700">
-                        <CheckCircle2 className="h-4 w-4" />
-                        คะแนนการตอบคำถาม: {q.evaluationScore} / 100
-                      </div>
-                      {q.evaluationFeedbackTh && (
-                        <p className="text-slate-700 leading-relaxed">
-                          <span className="font-semibold text-[#1F161A]">ความเห็นกรรมการ: </span>
-                          {q.evaluationFeedbackTh}
-                        </p>
-                      )}
-                      {q.improvedAnswerTh && (
-                        <p className="text-[#1F161A] leading-relaxed bg-[#FAF6F7] rounded-lg border border-[#E8DCE0] p-2.5">
-                          <span className="font-semibold text-[#BE2257]">
-                            ตัวอย่างคำตอบที่กระชับขึ้น:{' '}
-                          </span>
-                          &ldquo;{q.improvedAnswerTh}&rdquo;
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <TimelineChart
-        timeline={report.telemetryTimeline}
-        fillers={report.fillers}
-        hapticCues={report.hapticCues}
+      {/* Pop-Out Floating Side Q&A Drawer */}
+      <PostPresentationQADrawer
+        open={qaDrawerOpen}
+        onOpenChange={setQaDrawerOpen}
+        questions={report.audienceHistory ?? []}
+        judgeLoading={judgeLoading}
+        judgeSource={judgeSource}
+        aiNotice={aiNotice}
+        voiceMode={voiceMode}
+        onToggleVoiceMode={() =>
+          setVoiceMode((m) => (m === 'gemini' ? 'browser' : 'gemini'))
+        }
+        speakingId={speakingId}
+        onSpeakQuestion={speakQuestion}
+        onRegenerateQuestions={() => void generateJudgeQuestions(report, plan)}
+        draftAnswers={draftAnswers}
+        onChangeDraftAnswer={(id, value) =>
+          setDraftAnswers((prev) => ({ ...prev, [id]: value }))
+        }
+        evaluatingId={evaluatingId}
+        onSubmitAnswer={(q) => void submitAnswerForEvaluation(q)}
+        hotwords={plan?.technicalHotwords ?? []}
       />
-
-      <div className="rounded-2xl border border-[#E8DCE0] bg-white p-5 space-y-3 shadow-sm">
-        <h3 className="text-base font-bold text-[#1F161A]">
-          บันทึกคำพูด (Transcript)
-        </h3>
-        {report.transcriptSegments.length === 0 ? (
-          <p className="text-xs text-slate-500">
-            ไม่มีข้อความถอดเสียงในเซสชันนี้ (แนะนำใช้ Google Chrome เพื่อเปิดใช้งาน Thai Web Speech)
-          </p>
-        ) : (
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-            {report.transcriptSegments.map((seg, idx) => (
-              <div
-                key={idx}
-                className="rounded-xl bg-[#FAF6F7] border border-[#E8DCE0] p-3 text-xs"
-              >
-                <span className="text-[#EC3D6A] font-semibold">
-                  [{Math.round(seg.startMs / 1000)}s • {seg.speakerId}]
-                </span>{' '}
-                <span className="text-slate-700">{seg.text}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
