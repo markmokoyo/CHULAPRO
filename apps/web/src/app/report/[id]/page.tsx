@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import {
   calculateFluencyScore,
+  calculateOverallScore,
   calculatePacingScore,
+  detectLexicalFillers,
   scoreToStars,
   type AudienceMessage,
   type PresentationPlan,
@@ -49,7 +51,7 @@ export default function ReportDetailPage() {
   const [report, setReport] = useState<AnySessionReport | null>(null);
   const [plan, setPlan] = useState<PresentationPlan | null>(null);
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
-  const [qaDrawerOpen, setQaDrawerOpen] = useState(true);
+  const [qaDrawerOpen, setQaDrawerOpen] = useState(false);
 
   const [judgeLoading, setJudgeLoading] = useState(false);
   const [speechAnalysisLoading, setSpeechAnalysisLoading] = useState(false);
@@ -64,6 +66,7 @@ export default function ReportDetailPage() {
   const [isEditingTranscript, setIsEditingTranscript] = useState(false);
   const [transcriptDraft, setTranscriptDraft] = useState('');
 
+  const lastLoadedIdRef = useRef<string | null>(null);
   const autoRequestedRef = useRef(false);
   const autoSpeechRequestedRef = useRef(false);
   const autoStarEvalRequestedRef = useRef(false);
@@ -251,12 +254,15 @@ export default function ReportDetailPage() {
         }
 
         if (data.questions && data.questions.length > 0) {
-          const updated: AnySessionReport = {
-            ...rep,
-            audienceHistory: data.questions,
-          };
-          saveSessionReport(updated);
-          setReport(updated);
+          setReport((curr) => {
+            const base = curr ?? rep;
+            const updated: AnySessionReport = {
+              ...base,
+              audienceHistory: data.questions,
+            };
+            saveSessionReport(updated);
+            return updated;
+          });
         }
       } catch (err) {
         setAiNotice(
@@ -271,6 +277,13 @@ export default function ReportDetailPage() {
 
   useEffect(() => {
     if (!params.id) return;
+    if (lastLoadedIdRef.current !== params.id) {
+      lastLoadedIdRef.current = params.id;
+      autoRequestedRef.current = false;
+      autoSpeechRequestedRef.current = false;
+      autoStarEvalRequestedRef.current = false;
+    }
+
     const found = getSessionReportById(params.id);
     if (!found) return;
 
@@ -323,9 +336,12 @@ export default function ReportDetailPage() {
     });
   };
 
-  const submitAnswerForEvaluation = async (question: AudienceMessage) => {
+  const submitAnswerForEvaluation = async (
+    question: AudienceMessage,
+    overrideAnswer?: string
+  ) => {
     if (!report) return;
-    const answerText = (draftAnswers[question.id] ?? '').trim();
+    const answerText = (overrideAnswer ?? draftAnswers[question.id] ?? '').trim();
     if (!answerText) return;
 
     setEvaluatingId(question.id);
@@ -356,24 +372,26 @@ export default function ReportDetailPage() {
       emitQuotaUpdated(data.quota);
       if (data.aiError) setAiNotice(data.aiError);
 
-      const updatedHistory = (report.audienceHistory ?? []).map((item) =>
-        item.id === question.id
-          ? {
-              ...item,
-              userAnswer: answerText,
-              evaluationScore: data.evaluationScore,
-              evaluationFeedbackTh: data.evaluationFeedbackTh,
-              improvedAnswerTh: data.improvedAnswerTh,
-            }
-          : item
-      );
-
-      const updatedReport: AnySessionReport = {
-        ...report,
-        audienceHistory: updatedHistory,
-      };
-      saveSessionReport(updatedReport);
-      setReport(updatedReport);
+      setReport((curr) => {
+        if (!curr) return curr;
+        const updatedHistory = (curr.audienceHistory ?? []).map((item) =>
+          item.id === question.id
+            ? {
+                ...item,
+                userAnswer: answerText,
+                evaluationScore: data.evaluationScore,
+                evaluationFeedbackTh: data.evaluationFeedbackTh,
+                improvedAnswerTh: data.improvedAnswerTh,
+              }
+            : item
+        );
+        const updatedReport: AnySessionReport = {
+          ...curr,
+          audienceHistory: updatedHistory,
+        };
+        saveSessionReport(updatedReport);
+        return updatedReport;
+      });
     } finally {
       setEvaluatingId(null);
     }
@@ -395,12 +413,39 @@ export default function ReportDetailPage() {
       endMs: report.transcriptSegments[i]?.endMs ?? (i + 1) * stepMs,
     }));
 
-    const updatedReport: AnySessionReport = {
-      ...report,
-      transcriptSegments: updatedSegments,
-    };
-    saveSessionReport(updatedReport);
-    setReport(updatedReport);
+    setReport((curr) => {
+      const base = curr ?? report;
+      const acousticFillers = base.fillers.filter((f) => f.layer === 'acoustic');
+      const lexicalFillers = updatedSegments.flatMap((seg) =>
+        detectLexicalFillers(seg.text, seg.endMs, 1, seg.speakerId)
+      );
+      const mergedFillers = [...acousticFillers, ...lexicalFillers].sort(
+        (a, b) => a.timestampMs - b.timestampMs
+      );
+      const durationMin = Math.max(0.25, base.durationSeconds / 60);
+      const fillerPerMinute = Number((mergedFillers.length / durationMin).toFixed(1));
+      const updatedMetrics = {
+        ...base.metrics,
+        fillerCount: mergedFillers.length,
+        fillerPerMinute,
+      };
+      const updatedOverall = calculateOverallScore({
+        averageSpm: updatedMetrics.averageSpm,
+        fillerPerMinute: updatedMetrics.fillerPerMinute,
+        eyeContactRatio: updatedMetrics.eyeContactRatio,
+        goodPostureRatio: updatedMetrics.goodPostureRatio,
+      });
+
+      const updatedReport: AnySessionReport = {
+        ...base,
+        transcriptSegments: updatedSegments,
+        fillers: mergedFillers,
+        metrics: updatedMetrics,
+        overallScore: updatedOverall,
+      };
+      saveSessionReport(updatedReport);
+      return updatedReport;
+    });
     setIsEditingTranscript(false);
   };
 
@@ -539,28 +584,6 @@ export default function ReportDetailPage() {
             starEvalLoading={starEvalLoading}
             onRegenerateStarEval={() => void generateStarEvaluation(report)}
           />
-
-          {/* Separated Q&A Quick Status Banner */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#DDD6FE] bg-gradient-to-r from-[#F5F3FF] via-white to-[#FFF0F5] px-5 py-4 shadow-sm">
-            <div className="space-y-0.5">
-              <div className="text-xs font-bold text-[#6D28D9]">
-                ช่วงถาม-ตอบหลังนำเสนอจบ (แยกวิเคราะห์ต่างหาก)
-              </div>
-              <p className="text-xs text-slate-600">
-                {qaSummary.answeredCount > 0
-                  ? `ตอบคำถามกรรมการแล้ว ${qaSummary.answeredCount}/${qaSummary.total} ข้อ • คะแนนเฉลี่ย Q&A ${qaSummary.avg}/100`
-                  : `มีคำถามรอฝึกตอบ ${qaSummary.total || 3} ข้อในกล่องด้านข้าง — กดฟังเสียงหรือพูดตอบด้วยไมค์ได้ทันที`}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setQaDrawerOpen(true)}
-              className="app-press inline-flex items-center gap-1.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] px-3.5 py-2 text-xs font-bold text-white shadow-sm"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              เปิดกล่องตอบคำถามข้างจอ
-            </button>
-          </div>
 
           {/* Speech Content Analysis Card */}
           {(!plan || report.speechAnalysis) && (
@@ -764,7 +787,9 @@ export default function ReportDetailPage() {
           setDraftAnswers((prev) => ({ ...prev, [id]: value }))
         }
         evaluatingId={evaluatingId}
-        onSubmitAnswer={(q) => void submitAnswerForEvaluation(q)}
+        onSubmitAnswer={(q, overrideAnswer) =>
+          void submitAnswerForEvaluation(q, overrideAnswer)
+        }
         hotwords={plan?.technicalHotwords ?? []}
       />
     </div>

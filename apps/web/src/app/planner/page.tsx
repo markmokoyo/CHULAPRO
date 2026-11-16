@@ -316,13 +316,13 @@ export default function PlannerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="animate-fade-up flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#1F161A]">
+          <h1 className="font-display text-xl sm:text-2xl font-bold text-[#2B2135]">
             เตรียมสไลด์ สคริปต์พูด และจัดสรรเวลา
           </h1>
           <p className="text-sm text-slate-500">
-            อัปโหลดสไลด์ (.pdf / .pptx / รูปภาพ) เพื่อดูภาพจริงทุกหน้า แก้ไขบทพูดรายหน้า และคำนวณเวลา
+            อัปโหลดสไลด์ (.pdf / .pptx / รูปภาพ) หรือวางบทพูดเพื่อให้ระบบแบ่งเวลาซ้อมให้อัตโนมัติ
           </p>
         </div>
         {plan && (
@@ -343,7 +343,7 @@ export default function PlannerPage() {
             <button
               type="button"
               onClick={() => router.push('/practice/solo')}
-              className="app-press flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition"
+              className="app-press cta-shimmer flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#EC3D6A] to-[#F472B6] hover:brightness-105 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition"
             >
               <Play className="h-4 w-4" />
               นำแผนนี้ไปซ้อมเดี่ยว
@@ -582,18 +582,16 @@ export default function PlannerPage() {
         {/* Right 8 Columns: Uncluttered Editorial Slide List */}
         <div className="lg:col-span-8 space-y-4">
           {!plan ? (
-            <div className="flex flex-col min-h-[340px] items-center justify-center rounded-2xl border border-dashed border-[#D8C5CB] bg-white p-8 text-center space-y-4">
-              <img
-                src="/images/studio-stage.svg"
-                alt="ภาพประกอบการจัดเตรียมสไลด์และห้องซ้อม"
-                className="w-60 h-auto rounded-xl border border-[#E8DCE0]"
-              />
+            <div className="flex flex-col min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-[#D8C5CB] bg-white/80 p-8 text-center space-y-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FCE8EE] text-[#EC3D6A]">
+                <FileUp className="h-6 w-6" />
+              </div>
               <div className="space-y-1 max-w-md">
-                <p className="text-sm font-bold text-[#1F161A]">
+                <p className="font-display text-base font-bold text-[#2B2135]">
                   ยังไม่มีชุดสไลด์ในคิวซ้อม
                 </p>
-                <p className="text-xs text-slate-500">
-                  แนบไฟล์ PDF, PPTX หรือไฟล์ภาพสไลด์ทางซ้าย เพื่อดูภาพสไลด์รายหน้า แบ่งเวลาพูดอัตโนมัติ และแก้ไขสคริปต์ก่อนขึ้นซ้อม
+                <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                  เลือกไฟล์ PDF, PPTX, รูปสไลด์ หรือวางบทพูดจากกล่องด้านซ้ายเพื่อแบ่งเวลาซ้อมอัตโนมัติ
                 </p>
               </div>
             </div>
@@ -627,8 +625,8 @@ export default function PlannerPage() {
                 )}
 
                 <div className="grid gap-2.5 sm:grid-cols-2 pt-1">
-                  <div className="rounded-xl bg-[#F0F9FF] border border-[#BAE6FD] p-3 text-xs">
-                    <div className="font-semibold text-[#0369A1] mb-1">
+                  <div className="rounded-xl bg-[#FAF6F7] border border-[#E8DCE0] p-3 text-xs">
+                    <div className="font-semibold text-[#BE2257] mb-1">
                       ประโยคเปิดเรื่องแนะนำ
                     </div>
                     <p className="text-slate-700 leading-relaxed">
@@ -636,7 +634,7 @@ export default function PlannerPage() {
                     </p>
                   </div>
                   {plan.closingStatement && (
-                    <div className="rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] p-3 text-xs">
+                    <div className="rounded-xl bg-[#FAF6F7] border border-[#E8DCE0] p-3 text-xs">
                       <div className="font-semibold text-[#047857] mb-1">
                         ประโยคปิดท้ายแนะนำ
                       </div>

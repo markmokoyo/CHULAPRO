@@ -299,6 +299,27 @@ export function ScoreOverview({
             </li>
           ))}
         </ul>
+
+        {/* Evaluation Reference Bar (moved from Home Dashboard for cleaner UX) */}
+        <div className="rounded-xl border border-[#A7F3D0] bg-[#ECFDF5]/60 px-4 py-3">
+          <p className="text-xs font-bold text-[#065F46] mb-1.5">
+            หลักเกณฑ์มาตรฐานที่ใช้ประเมิน
+          </p>
+          <div className="grid gap-1.5 sm:grid-cols-3 text-xs text-slate-700">
+            <div>
+              <span className="font-mono font-bold text-[#0EA5E9] mr-1.5">01</span>
+              ความเร็วพูดเหมาะสม 180–220 พยางค์/นาที
+            </div>
+            <div>
+              <span className="font-mono font-bold text-[#EC3D6A] mr-1.5">02</span>
+              คำติดปากไม่เกิน 2 ครั้ง/นาที
+            </div>
+            <div>
+              <span className="font-mono font-bold text-[#10B981] mr-1.5">03</span>
+              สบตาผู้ฟัง ≥ 75% และบุคลิกท่าทาง ≥ 80%
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

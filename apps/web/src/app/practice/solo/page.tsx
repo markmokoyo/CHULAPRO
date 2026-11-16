@@ -109,6 +109,7 @@ export default function SoloPracticePage() {
   const fastSinceRef = useRef<number | null>(null);
   const liveAlertsRef = useRef(liveAlertsEnabled);
   const showOverlayRef = useRef(showOverlay);
+  const useSlidesRef = useRef(useSlides);
   const slideIdxRef = useRef(slideIdx);
   const slideWarnedRef = useRef<Set<number>>(new Set());
   const recorderRef = useRef<SessionVideoRecorder | null>(null);
@@ -131,6 +132,10 @@ export default function SoloPracticePage() {
   }, [showOverlay]);
 
   useEffect(() => {
+    useSlidesRef.current = useSlides;
+  }, [useSlides]);
+
+  useEffect(() => {
     slideIdxRef.current = slideIdx;
     setSlideElapsedSec(0);
   }, [slideIdx]);
@@ -141,7 +146,9 @@ export default function SoloPracticePage() {
 
   const triggerCue = useCallback(
     (nowRelMs: number, reason: AlertReason) => {
-      const slideNum = (plan?.slides[slideIdxRef.current]?.slideNumber ?? 1);
+      const slideNum = useSlidesRef.current
+        ? (plan?.slides[slideIdxRef.current]?.slideNumber ?? 1)
+        : 1;
       const cue = cooldownRef.current.tryTrigger(nowRelMs, reason, slideNum);
       if (!cue) return;
       cuesRef.current.push(cue);
@@ -410,7 +417,9 @@ export default function SoloPracticePage() {
       setElapsedSec((s) => s + 1);
       setSlideElapsedSec((s) => {
         const next = s + 1;
-        const activeSlide = plan?.slides[slideIdxRef.current];
+        const activeSlide = useSlidesRef.current
+          ? plan?.slides[slideIdxRef.current]
+          : undefined;
         if (
           activeSlide &&
           activeSlide.allocatedSeconds - next === 10 &&
@@ -475,13 +484,13 @@ export default function SoloPracticePage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="animate-fade-up flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#1F161A]">
+          <h1 className="font-display text-xl sm:text-2xl font-bold text-[#2B2135]">
             ห้องซ้อมพูดเดี่ยว
           </h1>
-          <p className="text-xs text-slate-500">
-            เปิดกล้องและไมโครโฟนเพื่อจับจังหวะการพูด คำติดปาก และการสบตาผู้ฟัง
+          <p className="text-xs sm:text-sm text-slate-500">
+            จับจังหวะการพูด คำติดปาก และการสบตาแบบเรียลไทม์
           </p>
         </div>
 
@@ -519,7 +528,7 @@ export default function SoloPracticePage() {
               type="button"
               disabled={isLoadingModels}
               onClick={() => void startSession()}
-              className="app-press flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-[#EC3D6A] hover:bg-[#E13C6C] px-4 py-2 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+              className="app-press cta-shimmer flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#EC3D6A] to-[#F472B6] hover:brightness-105 px-4 py-2 text-sm font-bold text-white shadow-sm disabled:opacity-50"
             >
               {isLoadingModels ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -91,7 +91,36 @@ export function saveSessionReport(report: AnySessionReport): void {
     (r) => r.sessionId !== report.sessionId
   );
   const updated = [report, ...existing].slice(0, 50);
-  localStorage.setItem(REPORTS_KEY, JSON.stringify(updated));
+  try {
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(updated));
+  } catch {
+    // If QuotaExceededError occurs due to long telemetry timelines, downsample older reports
+    const compacted = updated.map((r, idx) =>
+      idx === 0
+        ? r
+        : {
+            ...r,
+            telemetryTimeline: r.telemetryTimeline.filter((_, i) => i % 4 === 0),
+          }
+    );
+    try {
+      localStorage.setItem(REPORTS_KEY, JSON.stringify(compacted.slice(0, 25)));
+    } catch {
+      localStorage.setItem(REPORTS_KEY, JSON.stringify([report]));
+    }
+  }
+}
+
+export function patchSessionReport(
+  sessionId: string,
+  patcher: (current: AnySessionReport) => AnySessionReport
+): AnySessionReport | null {
+  if (!isBrowser()) return null;
+  const current = getSessionReportById(sessionId);
+  if (!current) return null;
+  const updated = patcher(current);
+  saveSessionReport(updated);
+  return updated;
 }
 
 export function listSessionReports(): AnySessionReport[] {

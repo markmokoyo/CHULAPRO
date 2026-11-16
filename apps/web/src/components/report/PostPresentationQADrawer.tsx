@@ -33,7 +33,7 @@ interface PostPresentationQADrawerProps {
   draftAnswers: Record<string, string>;
   onChangeDraftAnswer: (questionId: string, value: string) => void;
   evaluatingId: string | null;
-  onSubmitAnswer: (q: AudienceMessage) => void;
+  onSubmitAnswer: (q: AudienceMessage, overrideAnswer?: string) => void;
   hotwords?: string[];
 }
 
@@ -153,6 +153,10 @@ export function PostPresentationQADrawer({
       onFinalTranscript: (text) => {
         const current = latestDraftsRef.current[questionId] ?? '';
         const merged = current.trim() ? `${current.trim()} ${text}` : text;
+        latestDraftsRef.current = {
+          ...latestDraftsRef.current,
+          [questionId]: merged,
+        };
         onChangeDraftAnswer(questionId, merged);
         setInterimVoiceText('');
       },
@@ -448,9 +452,14 @@ export function PostPresentationQADrawer({
                     id={`drawer-answer-${activeQuestion.id}`}
                     rows={3}
                     value={draftAnswers[activeQuestion.id] ?? ''}
-                    onChange={(e) =>
-                      onChangeDraftAnswer(activeQuestion.id, e.target.value)
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      latestDraftsRef.current = {
+                        ...latestDraftsRef.current,
+                        [activeQuestion.id]: val,
+                      };
+                      onChangeDraftAnswer(activeQuestion.id, val);
+                    }}
                     placeholder="กดปุ่มพูดตอบด้วยไมค์ หรือพิมพ์คำตอบของคุณที่นี่..."
                     className="w-full rounded-xl border border-[#D8C5CB] bg-[#FDF8FA] px-3 py-2 text-xs sm:text-sm text-[#2B2135] placeholder:text-slate-400 focus:outline-none focus:border-[#EC3D6A]"
                   />
@@ -459,11 +468,18 @@ export function PostPresentationQADrawer({
                     type="button"
                     disabled={
                       evaluatingId === activeQuestion.id ||
-                      !(draftAnswers[activeQuestion.id] ?? '').trim()
+                      (!(draftAnswers[activeQuestion.id] ?? '').trim() &&
+                        !(listeningId === activeQuestion.id && interimVoiceText.trim()))
                     }
                     onClick={() => {
-                      if (listeningId === activeQuestion.id) stopMic();
-                      onSubmitAnswer(activeQuestion);
+                      if (listeningId === activeQuestion.id) {
+                        stopMic();
+                      }
+                      const finalAnswer =
+                        latestDraftsRef.current[activeQuestion.id] ??
+                        draftAnswers[activeQuestion.id] ??
+                        '';
+                      onSubmitAnswer(activeQuestion, finalAnswer);
                     }}
                     className="app-press w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#EC3D6A] to-[#8B5CF6] hover:brightness-105 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-45"
                   >

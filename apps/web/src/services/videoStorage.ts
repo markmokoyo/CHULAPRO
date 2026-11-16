@@ -141,8 +141,15 @@ export async function extractVideoPayloadForAi(blob: Blob): Promise<{
     video.src = url;
 
     await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error('Video load failed'));
+      const timer = setTimeout(() => resolve(), 2000);
+      video.onloadedmetadata = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      video.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error('Video load failed'));
+      };
     });
 
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 10;
@@ -160,8 +167,17 @@ export async function extractVideoPayloadForAi(blob: Blob): Promise<{
         (duration * (i + 0.5)) / sampleCount
       );
       await new Promise<void>((resolve) => {
-        video.onseeked = () => resolve();
-        video.currentTime = targetTime;
+        const timer = setTimeout(() => resolve(), 1200);
+        video.onseeked = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        try {
+          video.currentTime = targetTime;
+        } catch {
+          clearTimeout(timer);
+          resolve();
+        }
       });
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
@@ -221,17 +237,33 @@ export function createSessionVideoRecorder(stream: MediaStream): SessionVideoRec
             );
             return;
           }
+          let settled = false;
+          const finish = (blob: Blob | null) => {
+            if (settled) return;
+            settled = true;
+            resolve(blob);
+          };
+          const timer = setTimeout(() => {
+            finish(
+              chunks.length > 0
+                ? new Blob(chunks, { type: recorder.mimeType || 'video/webm' })
+                : null
+            );
+          }, 1500);
+
           recorder.onstop = () => {
+            clearTimeout(timer);
             if (chunks.length === 0) {
-              resolve(null);
+              finish(null);
               return;
             }
-            resolve(new Blob(chunks, { type: recorder.mimeType || 'video/webm' }));
+            finish(new Blob(chunks, { type: recorder.mimeType || 'video/webm' }));
           };
           try {
             recorder.stop();
           } catch {
-            resolve(null);
+            clearTimeout(timer);
+            finish(null);
           }
         }),
     };
