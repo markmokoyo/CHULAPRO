@@ -362,7 +362,7 @@ export default function PlannerPage() {
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Left 4 Columns: Upload & Setup */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="rounded-2xl border border-[#E8DCE0] bg-white p-5 space-y-4 shadow-sm">
+          <div className="rounded-3xl border border-[#E8DCE0] bg-white p-5 space-y-4 shadow-sm">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -582,9 +582,13 @@ export default function PlannerPage() {
         {/* Right 8 Columns: Uncluttered Editorial Slide List */}
         <div className="lg:col-span-8 space-y-4">
           {!plan ? (
-            <div className="flex flex-col min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-[#D8C5CB] bg-white/80 p-8 text-center space-y-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FCE8EE] text-[#EC3D6A]">
-                <FileUp className="h-6 w-6" />
+            <div className="flex flex-col min-h-[290px] items-center justify-center rounded-3xl border border-dashed border-[#D8C5CB] bg-white/90 p-8 text-center space-y-4 shadow-sm">
+              <div className="overflow-hidden rounded-2xl border border-[#E0F2FE] bg-[#F0F9FF] p-1.5 shadow-sm">
+                <img
+                  src="/images/mode-planner.png"
+                  alt="เตรียมสไลด์และจัดสรรเวลา"
+                  className="h-32 w-44 rounded-xl object-cover"
+                />
               </div>
               <div className="space-y-1 max-w-md">
                 <p className="font-display text-base font-bold text-[#2B2135]">
@@ -594,6 +598,14 @@ export default function PlannerPage() {
                   เลือกไฟล์ PDF, PPTX, รูปสไลด์ หรือวางบทพูดจากกล่องด้านซ้ายเพื่อแบ่งเวลาซ้อมอัตโนมัติ
                 </p>
               </div>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void handleDemoSlides()}
+                className="app-press inline-flex items-center gap-2 rounded-xl border border-[#BAE6FD] bg-[#F0F9FF] hover:bg-[#E0F2FE] px-4 py-2 text-xs font-semibold text-[#0369A1]"
+              >
+                ทดลองใช้ชุดสไลด์ตัวอย่าง (3 หน้า)
+              </button>
             </div>
           ) : (
             <>

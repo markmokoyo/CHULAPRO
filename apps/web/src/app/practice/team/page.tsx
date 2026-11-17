@@ -411,26 +411,36 @@ export default function TeamPracticePage() {
       )}
 
       {step === 'enroll' ? (
-        <div className="animate-fade-up rounded-2xl border border-[#E8DCE0] bg-white p-5 sm:p-6 space-y-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-bold text-[#1F161A] flex items-center gap-2">
-              <Users className="h-4 w-4 text-[#EC3D6A]" />
-              ลงทะเบียนสมาชิกทีม ({members.length}/5 คน)
-            </h2>
+        <div className="animate-fade-up rounded-3xl border border-[#E8DCE0] bg-white p-5 sm:p-6 space-y-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EDE9FE] bg-[#F5F3FF]/60 p-4">
+            <div className="flex items-center gap-3.5">
+              <div className="overflow-hidden rounded-2xl border border-[#DDD6FE] bg-white p-1 shadow-sm shrink-0">
+                <img
+                  src="/images/mode-team.png"
+                  alt="โหมดซ้อมนำเสนอกลุ่ม"
+                  className="h-14 w-16 rounded-xl object-cover"
+                />
+              </div>
+              <div>
+                <h2 className="font-display text-base font-bold text-[#1F161A] flex items-center gap-2">
+                  <Users className="h-4 w-4 text-[#8B5CF6]" />
+                  ลงทะเบียนสมาชิกทีม ({members.length}/5 คน)
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  ยืนเรียงหน้ากล้องจากซ้ายไปขวาตามลำดับรายชื่อเพื่อให้ระบบแยกผู้พูดได้แม่นยำ
+                </p>
+              </div>
+            </div>
             <button
               type="button"
               disabled={members.length >= 5}
               onClick={addMember}
-              className="app-press inline-flex items-center gap-1.5 rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] hover:bg-[#FCE8EE] px-3 py-1.5 text-xs font-semibold text-[#BE2257] disabled:opacity-40"
+              className="app-press inline-flex items-center gap-1.5 rounded-xl border border-[#DDD6FE] bg-white hover:bg-[#EDE9FE] px-3.5 py-2 text-xs font-semibold text-[#6D28D9] disabled:opacity-40"
             >
               <Plus className="h-3.5 w-3.5" />
               เพิ่มสมาชิก
             </button>
           </div>
-
-          <p className="text-xs text-slate-500">
-            แนะนำ: ให้สมาชิกยืนเรียงหน้ากล้องจากซ้ายไปขวาตามลำดับรายชื่อด้านล่างเพื่อให้ระบบจับคู่ใบหน้ากับชื่อได้แม่นยำ
-          </p>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {members.map((m, idx) => (

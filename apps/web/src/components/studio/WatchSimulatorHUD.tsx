@@ -121,16 +121,18 @@ export function WatchSimulatorHUD({
       : '#EC3D6A';
 
   return (
-    <div className="rounded-2xl border border-[#E8DCE0] bg-white p-4 shadow-sm space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-          <Watch className="h-4 w-4 text-[#EC3D6A]" />
+    <div className="rounded-3xl border border-[#E8DCE0] bg-white p-4 sm:p-5 shadow-sm space-y-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#2B2135]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#FCE8EE] text-[#EC3D6A]">
+            <Watch className="h-4 w-4" />
+          </span>
           นาฬิกาเตือนจังหวะ (จำลองสมาร์ทวอทช์)
         </div>
         <button
           type="button"
           onClick={onToggleLiveAlerts}
-          className={`app-press flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${
+          className={`app-press flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
             liveAlertsEnabled
               ? 'bg-[#FCE8EE] text-[#BE2257] border border-[#F2C4D0]'
               : 'bg-slate-100 text-slate-500 border border-slate-200'
@@ -151,79 +153,54 @@ export function WatchSimulatorHUD({
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Circular Watch Face with SVG Progress Ring */}
-        <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+        {/* 3D Smartwatch Visual Frame with Live Pulse & Cooldown Badge */}
+        <div className="relative h-28 w-28 shrink-0">
           {displayCue && (
             <div
-              className={`animate-pulse-ring absolute inset-0 rounded-full border-2 ${style?.ring}`}
+              className={`animate-pulse-ring absolute -inset-1 rounded-2xl border-2 ${style?.ring}`}
             />
           )}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 96 96"
-            className="absolute inset-0 h-full w-full -rotate-90"
-          >
-            <circle
-              cx="48"
-              cy="48"
-              r={RING_RADIUS}
-              fill="none"
-              stroke="#F5EEF0"
-              strokeWidth="4"
-            />
-            <circle
-              cx="48"
-              cy="48"
-              r={RING_RADIUS}
-              fill="none"
-              stroke={ringStrokeColor}
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={RING_CIRCUMFERENCE}
-              strokeDashoffset={ringOffset}
-              className="transition-all duration-300"
-            />
-          </svg>
           <div
-            className={`relative flex h-[74px] w-[74px] flex-col items-center justify-center rounded-full border-2 bg-gradient-to-br from-[#3D2C56] to-[#573A7A] text-center shadow-lg transition-all ${
-              displayCue ? `animate-watch-buzz ${style?.ring}` : 'border-[#DDD6FE]'
+            className={`relative h-full w-full overflow-hidden rounded-2xl border-2 bg-[#FDF8FA] shadow-sm transition-all ${
+              displayCue
+                ? `animate-watch-buzz ${style?.ring}`
+                : 'border-[#F2D7E0]'
             }`}
           >
-            {displayCue ? (
-              <>
-                <span className="text-[10px] font-bold text-white">PULSE</span>
-                <span className="mt-0.5 text-[9px] text-[#FF9EB8] px-1 leading-tight">
-                  {displayCue.pattern.replace('_', ' ')}
+            <img
+              src="/images/smartwatch-cue.png"
+              alt="สมาร์ทวอทช์จำลองการสั่นเตือน"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-x-1.5 bottom-1.5 flex items-center justify-center">
+              {displayCue ? (
+                <span className="rounded-full bg-[#2B2135]/90 px-2.5 py-0.5 text-[10px] font-bold text-[#FF9EB8] shadow-sm backdrop-blur-sm">
+                  PULSE • {displayCue.pattern.replace('_', ' ')}
                 </span>
-              </>
-            ) : (
-              <>
-                <span className="text-xs font-semibold text-white">
-                  {cooldownSec > 0 ? `${cooldownSec}s` : 'READY'}
+              ) : (
+                <span className="rounded-full bg-white/95 border border-[#E8DCE0] px-2.5 py-0.5 text-[10px] font-bold text-[#2B2135] shadow-sm backdrop-blur-sm tabular-nums">
+                  {cooldownSec > 0 ? `พักเตือน ${cooldownSec}s` : 'READY • 20s'}
                 </span>
-                <span className="text-[9px] text-[#FF8FAB]">
-                  {cooldownSec > 0 ? 'พักเตือน' : '20s Window'}
-                </span>
-              </>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
         {/* Status & Cooldown Bar */}
-        <div className="min-w-0 flex-1 space-y-2">
+        <div className="min-w-0 flex-1 space-y-2.5">
           {displayCue ? (
             <div>
               <span
-                className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${style?.badge}`}
+                className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${style?.badge}`}
               >
                 {style?.label}
               </span>
-              <p className="mt-1 text-sm font-semibold text-[#1F161A]">
+              <p className="mt-1.5 text-sm font-semibold text-[#1F161A] leading-snug">
                 {displayCue.messageTh}
               </p>
             </div>
           ) : (
-            <p className="text-sm text-slate-600">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               {liveAlertsEnabled
                 ? 'พร้อมส่งสัญญาณเตือนแบบไร้เสียง (พักเตือนขั้นต่ำ 20 วินาที)'
                 : 'ปิดการสั่นระหว่างพูดแล้ว — ระบบจะบันทึกผลไว้ในรายงานแทน'}
@@ -233,11 +210,13 @@ export function WatchSimulatorHUD({
           <div>
             <div className="mb-1 flex justify-between text-[11px] text-slate-500">
               <span>ระยะพักเตือน (20 วินาที)</span>
-              <span>{cooldownSec > 0 ? `รออีก ${cooldownSec}s` : 'พร้อมเตือน'}</span>
+              <span className="font-semibold text-[#BE2257] tabular-nums">
+                {cooldownSec > 0 ? `รออีก ${cooldownSec}s` : 'พร้อมเตือน'}
+              </span>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#F5EEF0]">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[#F5EEF0]">
               <div
-                className="h-full bg-[#FB6F92] transition-all duration-300"
+                className="h-full rounded-full bg-gradient-to-r from-[#EC3D6A] to-[#8B5CF6] transition-all duration-300"
                 style={{ width: `${cooldownProgress}%` }}
               />
             </div>
@@ -246,9 +225,9 @@ export function WatchSimulatorHUD({
       </div>
 
       {/* Quick Haptic Pattern Tester */}
-      <div className="flex flex-wrap items-center gap-1.5 border-t border-[#E8DCE0] pt-2.5">
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 mr-1">
-          <Vibrate className="h-3 w-3 text-[#EC3D6A]" />
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-[#E8DCE0] pt-3">
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 mr-1">
+          <Vibrate className="h-3.5 w-3.5 text-[#EC3D6A]" />
           ลองจังหวะสั่น:
         </span>
         {QUICK_TESTS.map((preset) => {
@@ -258,9 +237,9 @@ export function WatchSimulatorHUD({
               key={preset.pattern}
               type="button"
               onClick={() => triggerTestPattern(preset)}
-              className={`app-press rounded-lg px-2 py-1 text-[11px] font-semibold border transition-colors ${
+              className={`app-press rounded-full px-3 py-1 text-[11px] font-semibold border transition-colors ${
                 isTesting
-                  ? 'bg-[#EC3D6A] text-white border-[#EC3D6A]'
+                  ? 'bg-[#EC3D6A] text-white border-[#EC3D6A] shadow-sm'
                   : 'bg-[#FAF6F7] text-[#1F161A] border-[#D8C5CB] hover:bg-[#FCE8EE]'
               }`}
             >

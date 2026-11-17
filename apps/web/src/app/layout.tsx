@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Anuphan, IBM_Plex_Sans_Thai, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { Navbar } from '@/components/Navbar';
+import { AppSplashScreen } from '@/components/studio/AppSplashScreen';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -47,6 +48,7 @@ export default function RootLayout({
       className={`${plusJakarta.variable} ${anuphan.variable} ${ibmPlexThai.variable}`}
     >
       <body className="font-sans antialiased bg-[#FAF6F7] text-[#1F161A]">
+        <AppSplashScreen />
         <Navbar />
         <main className="mx-auto max-w-7xl px-3.5 pt-4 pb-28 sm:px-6 sm:pt-6 sm:pb-12 lg:px-8">
           {children}

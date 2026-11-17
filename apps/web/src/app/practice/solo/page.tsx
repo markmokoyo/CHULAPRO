@@ -563,7 +563,7 @@ export default function SoloPracticePage() {
             className={
               isRunning && isFullscreenStage
                 ? 'fixed inset-0 z-50 bg-[#2A2038] flex items-center justify-center overflow-hidden'
-                : 'relative aspect-video overflow-hidden rounded-2xl border border-[#E8DCE0] bg-[#362947] shadow-sm'
+                : 'relative aspect-video overflow-hidden rounded-3xl border border-[#E8DCE0] bg-[#362947] shadow-sm'
             }
           >
             <video
@@ -576,6 +576,39 @@ export default function SoloPracticePage() {
               ref={canvasRef}
               className="pointer-events-none absolute inset-0 h-full w-full -scale-x-100"
             />
+
+            {!isRunning && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-[#FDF8FA] via-[#FFF5F8] to-[#F5F3FF] p-5 text-center">
+                <div className="mb-3 overflow-hidden rounded-2xl border border-[#F9A8D4] bg-white p-1.5 shadow-sm">
+                  <img
+                    src="/images/mode-solo.png"
+                    alt="ห้องซ้อมกล้อง CuePulse"
+                    className="h-20 w-28 sm:h-24 sm:w-32 rounded-xl object-cover"
+                  />
+                </div>
+                <p className="font-display text-sm sm:text-base font-bold text-[#2B2135]">
+                  พร้อมเปิดกล้องและไมโครโฟน
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 max-w-xs">
+                  {activePlan
+                    ? `สไลด์ที่เลือก: ${activePlan.fileName}`
+                    : 'โหมดซ้อมพูดอิสระ — จับจังหวะ คำติดปาก และสายตา'}
+                </p>
+                <button
+                  type="button"
+                  disabled={isLoadingModels}
+                  onClick={() => void startSession()}
+                  className="app-press cta-shimmer mt-3.5 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#EC3D6A] to-[#F472B6] hover:brightness-105 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-[#EC3D6A]/20 disabled:opacity-50"
+                >
+                  {isLoadingModels ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                  {isLoadingModels ? 'กำลังเตรียมกล้องและไมค์...' : 'แตะเพื่อเปิดกล้องและเริ่มซ้อม'}
+                </button>
+              </div>
+            )}
 
             {isRunning && (
               <CameraEdgeAura reason={activeCue?.reason ?? liveAuraReason} />

@@ -77,7 +77,7 @@ export function Navbar() {
       {/* Mobile Floating App Dock */}
       <nav
         aria-label="เมนูหลักมือถือ"
-        className="sm:hidden fixed bottom-2.5 inset-x-2.5 z-40 flex items-center justify-around rounded-2xl border border-[#E8DCE0] bg-white/95 px-2 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] backdrop-blur-md shadow-lg shadow-slate-900/5"
+        className="sm:hidden fixed bottom-2.5 inset-x-3 z-40 flex items-center justify-around rounded-3xl border border-[#E8DCE0] bg-white/95 px-2 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] backdrop-blur-xl shadow-xl shadow-[#2B2135]/10"
       >
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
