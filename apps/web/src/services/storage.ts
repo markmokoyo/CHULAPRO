@@ -4,6 +4,23 @@ const PLANS_KEY = 'cuepulse_plans_v1';
 const ACTIVE_PLAN_KEY = 'cuepulse_active_plan_id_v1';
 const REPORTS_KEY = 'cuepulse_reports_v1';
 const GEMINI_KEY_STORAGE = 'cuepulse_gemini_api_key_v1';
+const PREFERENCES_KEY = 'cuepulse_preferences_v1';
+
+export interface AppPreferences {
+  recordVideo: boolean;
+  showOverlay: boolean;
+  liveAlerts: boolean;
+  voiceMode: 'gemini' | 'browser';
+  defaultDurationMinutes: number;
+}
+
+export const DEFAULT_PREFERENCES: AppPreferences = {
+  recordVideo: true,
+  showOverlay: true,
+  liveAlerts: true,
+  voiceMode: 'gemini',
+  defaultDurationMinutes: 5,
+};
 
 export type AnySessionReport = SessionReport | TeamSessionReport;
 
@@ -136,4 +153,52 @@ export function listSessionReports(): AnySessionReport[] {
 export function getSessionReportById(sessionId: string): AnySessionReport | null {
   if (!isBrowser()) return null;
   return listSessionReports().find((r) => r.sessionId === sessionId) ?? null;
+}
+
+export function deleteSessionReport(sessionId: string): void {
+  if (!isBrowser()) return;
+  const remaining = listSessionReports().filter((r) => r.sessionId !== sessionId);
+  localStorage.setItem(REPORTS_KEY, JSON.stringify(remaining));
+}
+
+export function clearAllSessionReports(): void {
+  if (!isBrowser()) return;
+  localStorage.removeItem(REPORTS_KEY);
+}
+
+export function clearAllPlans(): void {
+  if (!isBrowser()) return;
+  localStorage.removeItem(PLANS_KEY);
+  localStorage.removeItem(ACTIVE_PLAN_KEY);
+}
+
+export function getAppPreferences(): AppPreferences {
+  if (!isBrowser()) return DEFAULT_PREFERENCES;
+  try {
+    const raw = localStorage.getItem(PREFERENCES_KEY);
+    if (!raw) return DEFAULT_PREFERENCES;
+    const parsed = JSON.parse(raw) as Partial<AppPreferences>;
+    return {
+      recordVideo: parsed.recordVideo ?? DEFAULT_PREFERENCES.recordVideo,
+      showOverlay: parsed.showOverlay ?? DEFAULT_PREFERENCES.showOverlay,
+      liveAlerts: parsed.liveAlerts ?? DEFAULT_PREFERENCES.liveAlerts,
+      voiceMode: parsed.voiceMode === 'browser' ? 'browser' : 'gemini',
+      defaultDurationMinutes:
+        typeof parsed.defaultDurationMinutes === 'number' &&
+        parsed.defaultDurationMinutes >= 1 &&
+        parsed.defaultDurationMinutes <= 60
+          ? parsed.defaultDurationMinutes
+          : DEFAULT_PREFERENCES.defaultDurationMinutes,
+    };
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
+export function saveAppPreferences(patch: Partial<AppPreferences>): AppPreferences {
+  const next = { ...getAppPreferences(), ...patch };
+  if (isBrowser()) {
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(next));
+  }
+  return next;
 }

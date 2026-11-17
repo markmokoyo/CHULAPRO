@@ -106,6 +106,38 @@ export async function getSessionVideo(sessionId: string): Promise<Blob | null> {
   }
 }
 
+export async function deleteSessionVideo(sessionId: string): Promise<void> {
+  memoryVideoCache.delete(sessionId);
+  try {
+    const db = await openVideoDb();
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(sessionId);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+    db.close();
+  } catch {
+    // ignore
+  }
+}
+
+export async function clearAllSessionVideos(): Promise<void> {
+  memoryVideoCache.clear();
+  try {
+    const db = await openVideoDb();
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+    db.close();
+  } catch {
+    // ignore
+  }
+}
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

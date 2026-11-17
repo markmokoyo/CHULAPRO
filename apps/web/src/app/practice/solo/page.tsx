@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Camera,
@@ -48,7 +49,7 @@ import { WatchSimulatorHUD } from '@/components/studio/WatchSimulatorHUD';
 import { SlideTeleprompter } from '@/components/studio/SlideTeleprompter';
 import { AudiencePanel } from '@/components/studio/AudiencePanel';
 import { CameraEdgeAura } from '@/components/studio/CameraEdgeAura';
-import { getActivePlan, saveSessionReport } from '@/services/storage';
+import { getActivePlan, getAppPreferences, saveSessionReport } from '@/services/storage';
 import {
   createSessionVideoRecorder,
   saveSessionVideo,
@@ -142,6 +143,10 @@ export default function SoloPracticePage() {
 
   useEffect(() => {
     setPlan(getActivePlan());
+    const prefs = getAppPreferences();
+    setRecordVideo(prefs.recordVideo);
+    setShowOverlay(prefs.showOverlay);
+    setLiveAlertsEnabled(prefs.liveAlerts);
   }, []);
 
   const triggerCue = useCallback(
@@ -485,13 +490,21 @@ export default function SoloPracticePage() {
   return (
     <div className="space-y-5">
       <div className="animate-fade-up flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-display text-xl sm:text-2xl font-bold text-[#2B2135]">
-            ห้องซ้อมพูดเดี่ยว
+            ห้องซ้อมพูด
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500">
-            จับจังหวะการพูด คำติดปาก และการสบตาแบบเรียลไทม์
-          </p>
+          <div className="inline-flex rounded-2xl border border-[#E8DCE0] bg-[#F5EEF0] p-1 text-xs">
+            <span className="rounded-xl bg-white px-3 py-1 font-bold text-[#1F161A] shadow-sm border border-[#E8DCE0]">
+              เดี่ยว
+            </span>
+            <Link
+              href="/practice/team"
+              className="rounded-xl px-3 py-1 font-semibold text-slate-600 hover:text-[#EC3D6A]"
+            >
+              กลุ่ม
+            </Link>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">

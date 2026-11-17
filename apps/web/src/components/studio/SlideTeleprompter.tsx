@@ -101,7 +101,7 @@ export function SlideTeleprompter({
               >
                 <span className="inline-flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5 text-[#EC3D6A]" />
-                  สคริปต์หรือบันทึกย่อสำหรับดูระหว่างซ้อม (ไม่บังคับ)
+                  สคริปต์พูด (ไม่บังคับ)
                 </span>
               </label>
               <textarea
@@ -109,15 +109,11 @@ export function SlideTeleprompter({
                 rows={5}
                 value={freeformScript}
                 onChange={(e) => onChangeFreeformScript?.(e.target.value)}
-                placeholder="วางบทพูดหรือหัวข้อย่อยที่อยากพูดถึงที่นี่... หรือปล่อยว่างไว้เพื่อพูดสดได้เลย"
+                placeholder="วางบทพูดหรือหัวข้อย่อย..."
                 className="w-full rounded-xl border border-[#D8C5CB] bg-[#FAF6F7] px-3 py-2.5 text-sm leading-relaxed text-[#1F161A] placeholder:text-slate-400 focus:outline-none focus:border-[#EC3D6A]"
               />
             </div>
           )}
-
-          <p className="rounded-xl border border-[#E8DCE0] bg-[#FAF6F7] px-3 py-2 text-xs text-slate-600 leading-relaxed">
-            หากไม่ได้อัปโหลดสไลด์ หลังจบการซ้อมระบบจะนำเสียงพูดที่ถอดความได้มาวิเคราะห์โครงสร้างและประเมินความชัดเจนให้โดยอัตโนมัติ
-          </p>
         </div>
       </div>
     );

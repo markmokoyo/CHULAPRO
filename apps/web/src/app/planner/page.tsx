@@ -30,6 +30,7 @@ import {
 } from '@/services/slideParser';
 import {
   getAiRequestHeaders,
+  getAppPreferences,
   listPlans,
   savePlan,
   setActivePlanId,
@@ -60,6 +61,8 @@ export default function PlannerPage() {
   const [pastedScript, setPastedScript] = useState('');
 
   useEffect(() => {
+    const prefs = getAppPreferences();
+    setDurationMinutes(prefs.defaultDurationMinutes);
     const existing = listPlans();
     setSavedPlans(existing);
     if (existing.length > 0) {
@@ -319,11 +322,8 @@ export default function PlannerPage() {
       <div className="animate-fade-up flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-xl sm:text-2xl font-bold text-[#2B2135]">
-            เตรียมสไลด์ สคริปต์พูด และจัดสรรเวลา
+            เตรียมสไลด์ & สคริปต์พูด
           </h1>
-          <p className="text-sm text-slate-500">
-            อัปโหลดสไลด์ (.pdf / .pptx / รูปภาพ) หรือวางบทพูดเพื่อให้ระบบแบ่งเวลาซ้อมให้อัตโนมัติ
-          </p>
         </div>
         {plan && (
           <div className="flex w-full sm:w-auto flex-wrap items-center gap-2">
@@ -445,10 +445,10 @@ export default function PlannerPage() {
                     <FileUp className="h-7 w-7 text-[#EC3D6A]" />
                   )}
                   <span className="mt-2 text-sm font-semibold text-[#1F161A] truncate max-w-full">
-                    {fileName || 'เลือกไฟล์ .pdf / .pptx / รูปสไลด์'}
+                    {fileName || 'เลือกไฟล์ .pdf / .pptx / รูปภาพ'}
                   </span>
                   <span className="mt-1 text-xs text-slate-500">
-                    รองรับไฟล์ PDF (แสดงภาพจริงทุกหน้า), PPTX, หรือเลือกหลายรูปภาพพร้อมกัน
+                    PDF • PPTX • รูปภาพสไลด์
                   </span>
                   <input
                     type="file"
@@ -592,10 +592,10 @@ export default function PlannerPage() {
               </div>
               <div className="space-y-1 max-w-md">
                 <p className="font-display text-base font-bold text-[#2B2135]">
-                  ยังไม่มีชุดสไลด์ในคิวซ้อม
+                  ยังไม่มีชุดสไลด์ในคิว
                 </p>
-                <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-                  เลือกไฟล์ PDF, PPTX, รูปสไลด์ หรือวางบทพูดจากกล่องด้านซ้ายเพื่อแบ่งเวลาซ้อมอัตโนมัติ
+                <p className="text-xs text-slate-500">
+                  อัปโหลดไฟล์หรือวางบทพูดทางซ้าย
                 </p>
               </div>
               <button

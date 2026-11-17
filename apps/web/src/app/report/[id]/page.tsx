@@ -487,11 +487,11 @@ export default function ReportDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link
-            href="/"
+            href="/reports"
             className="app-press inline-flex items-center gap-1.5 rounded-full border border-[#E8DCE0] bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-[#EC3D6A] hover:text-[#EC3D6A] shadow-sm mb-2"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            กลับหน้าหลัก
+            สรุปผลทั้งหมด
           </Link>
           <h1 className="font-display text-xl sm:text-2xl font-bold text-[#2B2135]">
             รายงานผลการฝึกซ้อม ({report.mode === 'team' ? 'ซ้อมกลุ่ม' : 'ซ้อมเดี่ยว'})
