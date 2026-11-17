@@ -28,6 +28,7 @@ import {
 } from '@/services/storage';
 import { clearAllSessionVideos } from '@/services/videoStorage';
 import { emitQuotaUpdated } from '@/components/AiQuotaBadge';
+import { MobileAppInstaller } from '@/components/studio/MobileAppInstaller';
 
 function ToggleRow({
   label,
@@ -150,6 +151,8 @@ export default function SettingsPage() {
           {notice}
         </div>
       )}
+
+      <MobileAppInstaller />
 
       {/* Group 1: Default Studio Settings */}
       {prefs && (

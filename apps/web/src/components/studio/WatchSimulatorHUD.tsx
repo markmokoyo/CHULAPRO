@@ -1,8 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, BellOff, Vibrate, Watch } from 'lucide-react';
+import Link from 'next/link';
+import { Bell, BellOff, Bluetooth, ExternalLink, Vibrate, Watch } from 'lucide-react';
 import type { HapticCueEvent, HapticPatternType } from '@cuepulse/shared';
+import {
+  connectBleSmartwatch,
+  getConnectedBleDeviceName,
+  getOrCreateWatchPairCode,
+  isWebBluetoothSupported,
+  sendBleAlert,
+  triggerNativeAndroidWearCue,
+} from '@/services/watchBridge';
 
 interface WatchSimulatorHUDProps {
   activeCue: HapticCueEvent | null;
@@ -74,13 +83,26 @@ export function WatchSimulatorHUD({
   onToggleLiveAlerts,
 }: WatchSimulatorHUDProps) {
   const [previewCue, setPreviewCue] = useState<HapticCueEvent | null>(null);
+  const [pairCode, setPairCode] = useState('1234');
+  const [bleName, setBleName] = useState<string | null>(null);
+  const [bleSupported, setBleSupported] = useState(false);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    setPairCode(getOrCreateWatchPairCode());
+    setBleSupported(isWebBluetoothSupported());
+    setBleName(getConnectedBleDeviceName());
     return () => {
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     };
   }, []);
+
+  const handleBleConnect = async () => {
+    const res = await connectBleSmartwatch();
+    if (res.connected && res.deviceName) {
+      setBleName(res.deviceName);
+    }
+  };
 
   const triggerTestPattern = (preset: (typeof QUICK_TESTS)[number]) => {
     const sample: HapticCueEvent = {
@@ -92,6 +114,8 @@ export function WatchSimulatorHUD({
       slideNumber: 1,
     };
     setPreviewCue(sample);
+    void sendBleAlert(preset.pattern);
+    triggerNativeAndroidWearCue(sample);
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate(PATTERN_STYLE[preset.pattern].vibratePattern);
@@ -224,29 +248,64 @@ export function WatchSimulatorHUD({
         </div>
       </div>
 
-      {/* Quick Haptic Pattern Tester */}
-      <div className="flex flex-wrap items-center gap-1.5 border-t border-[#E8DCE0] pt-3">
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 mr-1">
-          <Vibrate className="h-3.5 w-3.5 text-[#EC3D6A]" />
-          ลองจังหวะสั่น:
-        </span>
-        {QUICK_TESTS.map((preset) => {
-          const isTesting = previewCue?.pattern === preset.pattern;
-          return (
-            <button
-              key={preset.pattern}
-              type="button"
-              onClick={() => triggerTestPattern(preset)}
-              className={`app-press rounded-full px-3 py-1 text-[11px] font-semibold border transition-colors ${
-                isTesting
-                  ? 'bg-[#EC3D6A] text-white border-[#EC3D6A] shadow-sm'
-                  : 'bg-[#FAF6F7] text-[#1F161A] border-[#D8C5CB] hover:bg-[#FCE8EE]'
-              }`}
+      {/* Quick Haptic Pattern Tester & Watch Pairing */}
+      <div className="space-y-2.5 border-t border-[#E8DCE0] pt-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 mr-1">
+            <Vibrate className="h-3.5 w-3.5 text-[#EC3D6A]" />
+            ลองจังหวะสั่น:
+          </span>
+          {QUICK_TESTS.map((preset) => {
+            const isTesting = previewCue?.pattern === preset.pattern;
+            return (
+              <button
+                key={preset.pattern}
+                type="button"
+                onClick={() => triggerTestPattern(preset)}
+                className={`app-press rounded-full px-3 py-1 text-[11px] font-semibold border transition-colors ${
+                  isTesting
+                    ? 'bg-[#EC3D6A] text-white border-[#EC3D6A] shadow-sm'
+                    : 'bg-[#FAF6F7] text-[#1F161A] border-[#D8C5CB] hover:bg-[#FCE8EE]'
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#EDE9FE] bg-[#F5F3FF]/60 px-3 py-2 text-[11px]">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[#6D28D9]">รหัสนาฬิกา:</span>
+            <span className="rounded-lg bg-white border border-[#DDD6FE] px-2 py-0.5 font-mono font-bold text-[#2B2135] tracking-wider">
+              {pairCode}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {bleSupported && (
+              <button
+                type="button"
+                onClick={() => void handleBleConnect()}
+                className={`app-press inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold transition ${
+                  bleName
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-[#DDD6FE] bg-white text-[#6D28D9] hover:bg-[#EDE9FE]'
+                }`}
+              >
+                <Bluetooth className="h-3 w-3" />
+                {bleName ? bleName : 'Bluetooth'}
+              </button>
+            )}
+            <Link
+              href="/watch"
+              target="_blank"
+              className="app-press inline-flex items-center gap-1 rounded-full bg-[#2B2135] hover:bg-[#433352] px-2.5 py-1 font-semibold text-white"
             >
-              {preset.label}
-            </button>
-          );
-        })}
+              หน้าปัดนาฬิกา
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

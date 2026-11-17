@@ -1,0 +1,34 @@
+name: Build Android & Wear OS APKs
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'apps/android/**'
+      - 'apps/wear/**'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build Mobile & Wear OS Debug APKs
+        working-directory: apps/android
+        run: gradle :app:assembleDebug :wear:assembleDebug
+      - name: Upload Mobile APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuepulse-mobile-apk
+          path: apps/android/app/build/outputs/apk/debug/*.apk
+      - name: Upload Wear OS APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuepulse-wear-apk
+          path: apps/wear/build/outputs/apk/debug/*.apk

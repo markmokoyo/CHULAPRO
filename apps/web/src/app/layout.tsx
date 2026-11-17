@@ -30,6 +30,10 @@ export const metadata: Metadata = {
   title: 'CuePulse — สตูดิโอฝึกซ้อมการนำเสนอ',
   description:
     'เครื่องมือฝึกทักษะการพูดและนำเสนอสำหรับนิสิตและทีมงาน วิเคราะห์จังหวะการพูด คำติดปาก และการสบตาผู้ฟัง',
+  icons: {
+    icon: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
+  },
   appleWebApp: {
     capable: true,
     title: 'CuePulse',

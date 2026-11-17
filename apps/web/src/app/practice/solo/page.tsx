@@ -51,6 +51,12 @@ import { AudiencePanel } from '@/components/studio/AudiencePanel';
 import { CameraEdgeAura } from '@/components/studio/CameraEdgeAura';
 import { getActivePlan, getAppPreferences, saveSessionReport } from '@/services/storage';
 import {
+  getOrCreateWatchPairCode,
+  pushStudioTelemetry,
+  sendBleAlert,
+  triggerNativeAndroidWearCue,
+} from '@/services/watchBridge';
+import {
   createSessionVideoRecorder,
   saveSessionVideo,
   type SessionVideoRecorder,
@@ -161,6 +167,13 @@ export default function SoloPracticePage() {
       if (liveAlertsRef.current) {
         setActiveCue(cue);
         flashAura(reason, 3200);
+        void sendBleAlert(cue.pattern);
+        triggerNativeAndroidWearCue(cue);
+        void pushStudioTelemetry(getOrCreateWatchPairCode(), {
+          isRunning: true,
+          mode: 'solo',
+          activeCue: cue,
+        });
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
           const pattern =
             cue.pattern === 'SOFT_TICK'
@@ -435,6 +448,33 @@ export default function SoloPracticePage() {
           triggerCue(relMs, 'SLIDE_TIME_WARNING');
         }
         return next;
+      });
+
+      const relMs = Date.now() - sessionStartMsRef.current;
+      const latestSnap = timelineRef.current[timelineRef.current.length - 1];
+      const activePlanSlides = useSlidesRef.current ? plan?.slides ?? [] : [];
+      const currSlide = activePlanSlides[slideIdxRef.current];
+      void pushStudioTelemetry(getOrCreateWatchPairCode(), {
+        isRunning: true,
+        mode: 'solo',
+        currentSpm: latestSnap?.currentSpm ?? 0,
+        slideNumber: currSlide?.slideNumber ?? 1,
+        totalSlides: Math.max(1, activePlanSlides.length),
+        cooldownRemainingMs: cooldownRef.current.remainingCooldownMs(relMs),
+      }).then((cmds) => {
+        for (const cmd of cmds) {
+          if (cmd.type === 'NEXT_SLIDE') {
+            setSlideIdx((i) =>
+              activePlanSlides.length > 0
+                ? Math.min(activePlanSlides.length - 1, i + 1)
+                : i
+            );
+          } else if (cmd.type === 'PREV_SLIDE') {
+            setSlideIdx((i) => Math.max(0, i - 1));
+          } else if (cmd.type === 'PING_VIBRATE') {
+            flashAura('FILLER_WORD', 1500);
+          }
+        }
       });
     }, 1000);
 
